@@ -8,11 +8,8 @@
 // `fleet-webhook-token` (or change tokenCredentialId below).
 // Serialize runs: a second webhook while a run is active must not share the
 // workspace or race the same PR branch. (Per-branch locking is a future add.)
-options {
-  disableConcurrentBuilds(abortPrevious: false)
-}
-
 properties([
+  disableConcurrentBuilds(),
   pipelineTriggers([
     [
       $class: 'GenericTrigger',
