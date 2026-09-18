@@ -95,30 +95,66 @@ def publish(
 ) -> PublishResult:
     base = base_branch or plan.manifest.pr.base
     branch = plan.branch()
-    wants_reply = (
-        plan.issue.is_pr_comment and plan.manifest.comment.reply and bool(body)
-    )
+    wants_reply = plan.issue.is_pr_comment and plan.manifest.comment.reply
 
     # Keep agent/COI runtime artifacts out of the commit (host-side, untracked).
     _write_runtime_excludes(workspace)
 
     files = changed_files(executor, workspace)
 
+    # For PR updates the agent may have committed inside the sandbox, so a clean
+    # working tree is not "no changes": count commits ahead of the PR head too.
+    env: Optional[Mapping[str, str]] = None
+    ahead = 0
+    if plan.update_existing_branch and plan.head_branch and not dry_run:
+        env = _token_env()
+        # Explicit refspec: single-branch shallow clones do not create
+        # refs/remotes/origin/<branch> for other branches otherwise.
+        fetch = executor.run(
+            [
+                "git",
+                "fetch",
+                "--depth",
+                "50",
+                "origin",
+                f"+{plan.head_branch}:refs/remotes/origin/{plan.head_branch}",
+            ],
+            cwd=workspace,
+            env=env,
+            timeout=600,
+        )
+        if fetch.exit_code != 0:
+            raise PublishError(
+                f"git fetch failed (exit {fetch.exit_code}): "
+                f"{fetch.stderr.strip() or fetch.stdout.strip()}"
+            )
+        ahead = _rev_count(executor, workspace, env, f"origin/{plan.head_branch}..HEAD")
+        if ahead:
+            files = _diff_files(
+                executor, workspace, env, f"origin/{plan.head_branch}..HEAD"
+            )
+
+    have_changes = bool(files) or ahead > 0
+
     if plan.mode == "new_pr" and not files:
         return PublishResult(status="no_changes", branch=branch)
 
-    # Reply-only path: forced ``answer`` mode, or ``auto`` with nothing to push.
-    if plan.mode == "answer" or (plan.mode == "auto" and not files):
-        reply_url = None
-        if wants_reply and not dry_run:
-            reply_url = _comment_on_pr(plan, body, _token_env(), executor, workspace)
-        status = "succeeded" if (wants_reply or files) else "no_changes"
+    # Reply-only: forced ``answer``, or ``auto`` with nothing to push.
+    if plan.mode == "answer" or (plan.mode == "auto" and not have_changes):
+        if wants_reply:
+            reply = body or _reply_body(plan, workspace, files, pushed=False)
+            reply_url = None
+            if not dry_run:
+                reply_url = _comment_on_pr(plan, reply, _token_env(), executor, workspace)
+            return PublishResult(
+                status="succeeded",
+                branch=branch,
+                pr_url=plan.pr_url,
+                changed_files=files,
+                reply_url=reply_url,
+            )
         return PublishResult(
-            status=status,
-            branch=branch,
-            pr_url=plan.pr_url,
-            changed_files=files,
-            reply_url=reply_url,
+            status="no_changes", branch=branch, pr_url=plan.pr_url, changed_files=files
         )
 
     if dry_run:
@@ -129,7 +165,8 @@ def publish(
             changed_files=files,
         )
 
-    env = _token_env()
+    if env is None:
+        env = _token_env()
 
     def run(argv: list[str], *, name: str, timeout: float = 300) -> None:
         res = executor.run(argv, cwd=workspace, env=env, timeout=timeout)
@@ -139,37 +176,37 @@ def publish(
             )
 
     if plan.update_existing_branch and plan.head_branch:
-        # Act on an existing PR: fetch the head branch and append (no force).
-        run(
-            ["git", "fetch", "--depth", "50", "origin", plan.head_branch],
-            name="git fetch",
-            timeout=600,
-        )
-        run(
-            ["git", "checkout", "-B", branch, f"origin/{branch}"],
-            name="git checkout",
-        )
+        if ahead == 0:
+            # No agent commits: align to the PR head, then commit the changes.
+            run(
+                ["git", "checkout", "-B", branch, f"origin/{branch}"],
+                name="git checkout",
+            )
     else:
         run(["git", "checkout", "-B", branch], name="git checkout")
 
     run(["git", "add", "-A"], name="git add")
-    # Identity is passed per-command (-c) rather than written to .git/config:
-    # the COI sandbox protects .git/config read-only, and a trusted host-side
-    # publisher must not depend on being able to rewrite it.
-    run(
-        [
-            "git",
-            "-c",
-            f"user.name={bot_name}",
-            "-c",
-            f"user.email={bot_email}",
-            "commit",
-            "-m",
-            plan.pr_title,
-        ],
-        name="git commit",
-        timeout=60,
-    )
+    # The agent may have committed already (``ahead`` > 0, nothing staged); only
+    # create a commit when the working tree has changes to record.
+    if _has_staged(executor, workspace, env):
+        # Identity is passed per-command (-c) rather than written to .git/config:
+        # the COI sandbox protects .git/config read-only, and a trusted host-side
+        # publisher must not depend on being able to rewrite it.
+        run(
+            [
+                "git",
+                "-c",
+                f"user.name={bot_name}",
+                "-c",
+                f"user.email={bot_email}",
+                "commit",
+                "-m",
+                plan.pr_title,
+            ],
+            name="git commit",
+            timeout=60,
+        )
+
     origin = executor.run(
         ["git", "remote", "get-url", "origin"], cwd=workspace, env=env, timeout=30
     ).stdout.strip()
@@ -182,13 +219,19 @@ def publish(
     ]
     if plan.update_existing_branch:
         # Append to the PR branch: never force over human commits.
-        push_argv = ["git", "push", _push_target(origin, plan.repo, env.get("GH_TOKEN", "")), branch]
+        push_argv = [
+            "git",
+            "push",
+            _push_target(origin, plan.repo, env.get("GH_TOKEN", "")),
+            branch,
+        ]
     run(push_argv, name="git push", timeout=600)
 
     pr_url = plan.pr_url or _create_pr(plan, branch, base, body, env, executor, workspace)
     reply_url = None
     if wants_reply:
-        reply_url = _comment_on_pr(plan, body, env, executor, workspace)
+        reply = body or _reply_body(plan, workspace, files, pushed=True)
+        reply_url = _comment_on_pr(plan, reply, env, executor, workspace)
     return PublishResult(
         status="succeeded",
         branch=branch,
@@ -196,6 +239,39 @@ def publish(
         changed_files=files,
         reply_url=reply_url,
     )
+
+
+def _rev_count(executor: Executor, workspace: str, env: Mapping[str, str], rev: str) -> int:
+    res = executor.run(
+        ["git", "rev-list", "--count", rev], cwd=workspace, env=env, timeout=60
+    )
+    try:
+        return int(res.stdout.strip() or "0")
+    except ValueError:
+        return 0
+
+
+def _diff_files(
+    executor: Executor, workspace: str, env: Mapping[str, str], rev: str
+) -> list[str]:
+    res = executor.run(
+        ["git", "diff", "--name-only", rev], cwd=workspace, env=env, timeout=60
+    )
+    return [line.strip() for line in res.stdout.splitlines() if line.strip()]
+
+
+def _has_staged(executor: Executor, workspace: str, env: Mapping[str, str]) -> bool:
+    # `git diff --cached --quiet` exits 1 when there are staged changes.
+    res = executor.run(
+        ["git", "diff", "--cached", "--quiet"], cwd=workspace, env=env, timeout=60
+    )
+    return res.exit_code != 0
+
+
+def _reply_body(plan: RunPlan, workspace: str, files: list[str], *, pushed: bool) -> str:
+    from .planner import render_comment_reply
+
+    return render_comment_reply(plan, workspace, files, pushed=pushed)
 
 
 def _comment_on_pr(

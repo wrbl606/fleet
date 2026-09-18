@@ -42,8 +42,8 @@ def execute(
     dry_run: bool = False,
     notify: bool = True,
 ) -> RunResult:
-    from .planner import render_comment_reply, render_pr_body
-    from .publisher import changed_files, publish as do_publish
+    from .planner import render_pr_body
+    from .publisher import publish as do_publish
 
     result = RunResult(
         status="failed",
@@ -102,11 +102,9 @@ def execute(
             return result
 
         if publish_enabled:
-            files = changed_files(executor, workspace)
-            if plan.issue.is_pr_comment:
-                body = render_comment_reply(plan, workspace, files)
-            else:
-                body = render_pr_body(plan, workspace)
+            # PR comments get their reply body generated inside the publisher,
+            # from the final (post-exclude) changed-file set.
+            body = "" if plan.issue.is_pr_comment else render_pr_body(plan, workspace)
             pub = do_publish(
                 plan,
                 workspace,

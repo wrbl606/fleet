@@ -191,6 +191,7 @@ class PrCommentPublishTest(unittest.TestCase):
         executor = FakeExecutor(
             {
                 "git status --porcelain": StepResult("git", 0, stdout=" M a.py\n"),
+                "git diff --cached": StepResult("git", 1, stdout=""),
                 "git remote get-url origin": StepResult(
                     "git", 0, stdout="https://x-access-token:READ@github.com/o/r.git"
                 ),
@@ -211,7 +212,36 @@ class PrCommentPublishTest(unittest.TestCase):
         pushes = [c for c in joined if " push " in f" {c} "]
         self.assertTrue(pushes)
         self.assertFalse(any("--force-with-lease" in c for c in pushes))
+        self.assertTrue(any(" commit " in f" {c} " for c in joined))
         self.assertFalse(any(c.startswith("gh pr comment") for c in joined))
+
+    def test_existing_agent_commit_is_pushed_without_new_commit(self):
+        executor = FakeExecutor(
+            {
+                "git status --porcelain": StepResult("git", 0, stdout=""),
+                "git rev-list --count": StepResult("git", 0, stdout="1"),
+                "git diff --name-only": StepResult("git", 0, stdout="CHANGELOG.md\n"),
+                "git remote get-url origin": StepResult(
+                    "git", 0, stdout="https://x-access-token:READ@github.com/o/r.git"
+                ),
+                "gh pr comment": StepResult(
+                    "gh", 0, stdout="https://github.com/o/r/pull/14#issuecomment-2"
+                ),
+            }
+        )
+        result = publish(
+            make_pr_comment_plan(mode="auto", reply=True),
+            "/tmp",
+            executor,
+            bot_name="bot",
+            bot_email="b@e",
+            body="",
+        )
+        self.assertEqual(result.status, "succeeded")
+        joined = [" ".join(c) for c in executor.calls]
+        self.assertTrue(any(" push " in f" {c} " for c in joined))
+        self.assertFalse(any(" commit " in f" {c} " for c in joined))
+        self.assertTrue(result.reply_url.endswith("2"))
 
     def test_answer_mode_only_replies(self):
         executor = FakeExecutor(

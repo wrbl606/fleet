@@ -111,7 +111,13 @@ def _pr_url(issue: Issue, repo: str) -> Optional[str]:
     return f"https://github.com/{repo}/pull/{issue.pr_number}"
 
 
-def render_comment_reply(plan: RunPlan, repo_dir: str, changed_files: list[str]) -> str:
+def render_comment_reply(
+    plan: RunPlan,
+    repo_dir: str,
+    changed_files: list[str],
+    *,
+    pushed: bool = False,
+) -> str:
     """Human-facing PR reply: the agent's ``reply_file`` if present, else a summary."""
     reply_file = plan.manifest.comment.reply_file
     if reply_file:
@@ -122,11 +128,14 @@ def render_comment_reply(plan: RunPlan, repo_dir: str, changed_files: list[str])
                 return text + "\n"
 
     lines = ["**fleet agent** processed this comment."]
-    if changed_files:
+    if pushed and changed_files:
         branch = plan.head_branch or plan.branch()
         lines.append("")
         lines.append(f"Pushed changes to `{branch}`:")
         lines += [f"- `{f}`" for f in changed_files]
+    elif pushed:
+        lines.append("")
+        lines.append("Pushed a commit to this pull request.")
     else:
         lines.append("")
         lines.append("No file changes were required.")
