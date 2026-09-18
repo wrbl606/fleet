@@ -55,9 +55,11 @@ def external_id(plan: RunPlan) -> str:
     repo = plan.repo or plan.resolution.repo
     branch = plan.branch()
     key = plan.issue.key
+    # GitHub keys already include the repo (``owner/name#N``); avoid ``repo#repo``.
+    label = key if key.startswith(f"{repo}#") else f"{repo}#{key}"
     if plan.issue.is_pr_comment and plan.issue.comment_id:
-        return f"{repo}#{key}@{branch}#c{plan.issue.comment_id}"
-    return f"{repo}#{key}@{branch}"
+        return f"{label}@{branch}#c{plan.issue.comment_id}"
+    return f"{label}@{branch}"
 
 
 def post_run_finished(plan: RunPlan, result: RunResult) -> bool:

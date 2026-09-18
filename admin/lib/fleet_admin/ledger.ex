@@ -199,13 +199,20 @@ defmodule FleetAdmin.Ledger do
         repo = payload["repo"]
         branch = payload["branch"]
         comment_id = get_in(payload, ["issue", "comment_id"]) || payload["comment_id"]
+        # GitHub keys already include the repo; avoid "repo#repo#N".
+        label =
+          if is_binary(key) and is_binary(repo) and String.starts_with?(key, repo <> "#") do
+            key
+          else
+            "#{repo}##{key}"
+          end
 
         cond do
           key && repo && branch && comment_id ->
-            "#{repo}##{key}@#{branch}#c#{comment_id}"
+            "#{label}@#{branch}#c#{comment_id}"
 
           key && repo && branch ->
-            "#{repo}##{key}@#{branch}"
+            "#{label}@#{branch}"
 
           key && repo ->
             "#{repo}##{key}"
