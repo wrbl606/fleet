@@ -1,0 +1,9 @@
+[tools]
+# Admin panel (P6) + local Jenkins toolchain. `mise install` builds/downloads
+# these. If Erlang fails to build on a bare host without a C toolchain, either
+# install a compiler (gcc/make) or drop in a precompiled OTP from
+# https://builds.hex.pm/builds/otp/ into ~/.local/share/mise/installs/erlang/.
+erlang = "28.5"
+elixir = "1.20.4-otp-28"
+# JDK for the local Jenkins WAR (Jenkins is installed separately; see README).
+java = "21.0.2"

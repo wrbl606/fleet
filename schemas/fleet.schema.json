@@ -1,0 +1,73 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://fleet.dev/schemas/fleet.schema.json",
+  "title": ".fleet/fleet.toml",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "agent"],
+  "properties": {
+    "version": { "const": 1 },
+    "agent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["tool"],
+      "properties": {
+        "tool": { "enum": ["claude", "codex", "opencode", "pi", "custom"] },
+        "prompt_file": { "type": "string", "minLength": 1 },
+        "inline": { "type": "string", "minLength": 1 },
+        "command": { "type": "array", "items": { "type": "string" } },
+        "max_iterations": { "type": "integer", "minimum": 1 },
+        "llm_env": { "type": "string", "pattern": "^[A-Za-z_][A-Za-z0-9_]*$" },
+        "llm_credential_id": { "type": "string", "minLength": 1 }
+      },
+      "oneOf": [
+        { "required": ["prompt_file"] },
+        { "required": ["inline"] }
+      ]
+    },
+    "setup": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "script": { "type": "string", "minLength": 1 }
+      }
+    },
+    "verify": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "script": { "type": "string", "minLength": 1 }
+      }
+    },
+    "pr": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "branch_prefix": { "type": "string", "minLength": 1 },
+        "base": { "type": "string", "minLength": 1 },
+        "title": { "type": "string", "minLength": 1 },
+        "labels": { "type": "array", "items": { "type": "string" } },
+        "body_file": { "type": "string", "minLength": 1 }
+      }
+    },
+    "platform": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "os": { "enum": ["linux", "macos", "windows"] },
+        "requires": { "type": "array", "items": { "type": "string" } },
+        "arch": { "type": "string", "minLength": 1 }
+      }
+    },
+    "coi": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "profile": { "type": "string" },
+        "network": { "enum": ["restricted", "allowlist", "open"] },
+        "timeout": { "type": "string", "pattern": "^([0-9]+h)?([0-9]+m)?([0-9]+s)?$" },
+        "allowed_domains": { "type": "array", "items": { "type": "string" } }
+      }
+    }
+  }
+}

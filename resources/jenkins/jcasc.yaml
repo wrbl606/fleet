@@ -1,0 +1,124 @@
+# Jenkins Configuration as Code (JCasC) for the fleet agent pool (plan §12, P5).
+#
+# Reference for scaling the runner pool. Plugin fields are version-sensitive:
+# adapt to your installed plugin versions before applying.
+#
+# Apply with the Configuration as Code plugin, or merge into your existing
+# jenkins.yaml. Credentials are intentionally referenced by id, never inlined.
+
+jenkins:
+  systemMessage: "fLEET agent dispatcher"
+
+  # Static, long-lived Linux/COI nodes (one label each, AND-combinable).
+  nodes:
+    - permanent:
+        name: "linux-coi-1"
+        labelString: "fleet-agent linux amd64"
+        remoteFS: "/var/lib/jenkins"
+        numExecutors: 4
+        mode: EXCLUSIVE
+        launcher:
+          ssh:
+            host: "linux-coi-1.internal"
+            port: 22
+            credentialsId: "fleet-agent-ssh"
+        retryCount: 2
+
+    # Bare-metal macOS pool — only allowlisted repos route here (§8).
+    - permanent:
+        name: "macos-agent-1"
+        labelString: "fleet-agent-macos macos amd64 xcode-15"
+        remoteFS: "/Users/jenkins"
+        numExecutors: 1
+        mode: EXCLUSIVE
+        launcher:
+          ssh:
+            host: "macos-agent-1.internal"
+            port: 22
+            credentialsId: "fleet-agent-ssh"
+
+    # Bare-metal Windows pool.
+    - permanent:
+        name: "windows-agent-1"
+        labelString: "fleet-agent-windows windows amd64 msvc-2022"
+        remoteFS: "C:/jenkins"
+        numExecutors: 1
+        mode: EXCLUSIVE
+        launcher:
+          ssh:
+            host: "windows-agent-1.internal"
+            port: 22
+            credentialsId: "fleet-agent-ssh"
+
+  # Optional burst autoscaling (EC2 plugin). The dispatcher schedules onto
+  # `fleet-agent`; these ephemeral nodes join the same label.
+  clouds:
+    - ec2:
+        name: "fleet-linux-ec2"
+        region: "us-east-1"
+        instanceCapStr: "20"
+        useInstanceProfileForCredentials: false
+        credentialsId: "fleet-ec2"
+        sshKeysCredentialsId: "fleet-agent-ssh"
+        templates:
+          - description: "fleet linux coi spot"
+            ami: "ami-REPLACE_WITH_COI_BAKED_AMI"
+            instanceType: "c6i.2xlarge"
+            labelString: "fleet-agent linux amd64 dynamic"
+            id: "fleet-linux-spot"
+            numExecutors: 8
+            spotConfig:
+              spotMaxBidPrice: "0.10"
+            minimumInstances: 0
+            maximumInstances: 10
+            idleTerminationMinutes: 10
+
+credentials:
+  system:
+    domainCredentials:
+      - credentials:
+          # The dispatcher's GWT token (matches tokenCredentialId in Jenkinsfile).
+          - string:
+              id: "fleet-webhook-token"
+              scope: GLOBAL
+              secret: "${FLEET_WEBHOOK_TOKEN:?}"
+          - string:
+              id: "fleet-github-read"
+              scope: GLOBAL
+              secret: "${GH_READ_TOKEN:?}"
+          - string:
+              id: "fleet-github-token"
+              scope: GLOBAL
+              secret: "${GH_PUBLISH_TOKEN:?}"
+          - string:
+              id: "ANTHROPIC_API_KEY"
+              scope: GLOBAL
+              secret: "${ANTHROPIC_API_KEY:?}"
+          - usernamePassword:
+              id: "fleet-agent-ssh"
+              scope: GLOBAL
+              username: "${FLEET_AGENT_SSH_USER:?}"
+              password: "${FLEET_AGENT_SSH_PASSWORD:?}"
+
+unclassified:
+  # Jenkins root URL — required for BUILD_URL, notifications and PR statuses.
+  # Set this to your Jenkins public URL (JCasC supports ${JENKINS_URL} env
+  # substitution; a literal value is shown here for clarity).
+  location:
+    url: "https://jenkins.example.com/"
+  # Keep the fleet-config shared library available to every pipeline.
+  globalLibraries:
+    libraries:
+      - name: "fleet-config"
+        defaultVersion: "main"
+        retriever:
+          modernSCM:
+            scm:
+              # Use the modern GitSCMSource form; the legacy `git` (GitSCM)
+              # element is reported as an obsolete JCasC file format.
+              gitSource:
+                id: "fleet-config"
+                remote: "https://github.com/acme/fleet-config.git"
+                credentialsId: "fleet-github-read"
+                traits:
+                  - "gitBranchDiscovery"

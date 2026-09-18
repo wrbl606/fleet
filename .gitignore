@@ -1,0 +1,82 @@
+# --- Python ---
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.eggs/
+.venv/
+venv/
+env/
+build/
+dist/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.nox/
+
+# --- Elixir / Phoenix (admin panel; also covered by admin/.gitignore) ---
+_build/
+deps/
+erl_crash.dump
+*.ez
+fleet_admin-*.tar
+/cover/
+admin/priv/static/assets/
+admin/priv/static/cache_manifest.json
+
+# --- Node ---
+node_modules/
+npm-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# --- COI / fleet runtime state ---
+.coi/
+.fleet-coi/
+.fleet-tmp/
+
+# --- Local machine state (opencode/auth, mise, etc.) ---
+.local/
+
+# --- Agent runtime artifacts ---
+.claude/
+.opencode/
+.codex/
+
+# --- Secrets / env (never commit) ---
+.env
+.env.*
+!.env.example
+*.secret
+secrets.env
+*.pem
+*.key
+*.p12
+
+# --- Local, deployment-specific config (never commit) ---
+registry.local.yaml
+*.local.yaml
+
+# --- Databases / dumps ---
+*.db
+*.db-*
+*.sqlite
+*.sqlite3
+*.dump
+
+# --- Logs / temp ---
+*.log
+*.tmp
+*.pid
+
+# --- OS / editors ---
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+.idea/
+.vscode/

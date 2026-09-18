@@ -1,0 +1,16 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "fleetctl"
+version = "0.1.0"
+description = "The .fleet remote agent runner dispatcher core"
+requires-python = ">=3.11"
+dependencies = ["PyYAML>=6.0", "jsonschema>=4.18"]
+
+[project.scripts]
+fleetctl = "fleetctl.cli:main"
+
+[tool.setuptools]
+packages = ["fleetctl", "fleetctl.normalizers"]

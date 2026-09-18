@@ -1,0 +1,102 @@
+# Local Jenkins Configuration as Code for running the fLEET dispatcher.
+#
+# Jenkins is NOT bundled with this project — install the JDK + jenkins.war
+# separately (see README, "Jenkins (installed separately)"). This file is
+# applied by scripts/jenkins/start.sh, which sets the ${...} environment
+# variables below.
+#
+# Local-only credentials (admin/admin, dummy git tokens) — never reuse.
+
+jenkins:
+  systemMessage: "fLEET local dispatcher — Jenkins installed separately; see README"
+  numExecutors: 4
+  mode: NORMAL
+  # The controller doubles as the agent (local demo); expose the labels the
+  # dispatcher routes on so `node(plan.jenkins_label)` can schedule here.
+  labelString: "built-in fleet-agent linux amd64"
+  securityRealm:
+    local:
+      allowsSignup: false
+      users:
+        - id: "admin"
+          password: "admin"
+  authorizationStrategy:
+    loggedInUsersCanDoAnything:
+      allowAnonymousRead: false
+  globalNodeProperties:
+    - envVars:
+        env:
+          - key: "PATH"
+            value: "/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
+          - key: "FLEET_GIT_BASE_URL"
+            value: "${FLEET_GIT_BASE_URL:-}"
+          # FLEET_DRY_RUN=0 (with real tokens) enables real push + PR.
+          - key: "FLEET_DRY_RUN"
+            value: "${FLEET_DRY_RUN:-1}"
+          # Post run.finished back to the admin panel (start with admin/start.sh).
+          - key: "FLEET_INGEST_URL"
+            value: "http://localhost:4000/api/ingest"
+          - key: "FLEET_INGEST_TOKEN"
+            value: "local-dev-token"
+
+unclassified:
+  location:
+    # Jenkins root URL (from scripts/jenkins/start.sh --jenkins-url / JENKINS_URL).
+    # Determines BUILD_URL, which the panel stores as the per-run Jenkins link.
+    url: "${JENKINS_URL}"
+  globalLibraries:
+    libraries:
+      - name: "fleet-config"
+        defaultVersion: "main"
+        retriever:
+          modernSCM:
+            scm:
+              # Modern SCM source (not the legacy `git` GitSCM form, which
+              # JCasC flags as obsolete). gitSource == GitSCMSource.
+              gitSource:
+                id: "fleet-config"
+                remote: "file://${FLEET_CONFIG_GIT_REPO}"
+                traits:
+                  - "gitBranchDiscovery"
+
+credentials:
+  system:
+    domainCredentials:
+      - credentials:
+          # Provide GH_READ_TOKEN / GH_PUBLISH_TOKEN in the environment when
+          # starting Jenkins to use real tokens; otherwise dummy values keep
+          # dry-run/local runs working.
+          - string:
+              scope: GLOBAL
+              id: "fleet-webhook-token"
+              secret: "local-webhook-token"
+          - string:
+              scope: GLOBAL
+              id: "fleet-github-read"
+              secret: "${GH_READ_TOKEN:-local-read-token}"
+          - string:
+              scope: GLOBAL
+              id: "fleet-github-token"
+              secret: "${GH_PUBLISH_TOKEN:-local-publish-token}"
+          # LLM key forwarded into the sandbox for [agent].llm_env.
+          - string:
+              scope: GLOBAL
+              id: "OPENCODE_GO_SUBSCRIPTION_KEY"
+              secret: "${OPENCODE_GO_SUBSCRIPTION_KEY:-local-llm-key}"
+
+jobs:
+  - script: |
+      pipelineJob('fleet-dispatcher') {
+        definition {
+          cpsScm {
+            scm {
+              git {
+                remote { url('file://${FLEET_CONFIG_GIT_REPO}') }
+                branch('*/main')
+              }
+            }
+            scriptPath('Jenkinsfile')
+            lightweight(true)
+          }
+        }
+      }

@@ -1,0 +1,121 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://fleet.dev/schemas/registry.schema.json",
+  "title": "fleet registry.yaml",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["defaults", "sources"],
+  "properties": {
+    "defaults": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["github_org"],
+      "properties": {
+        "github_org": { "type": "string", "minLength": 1 },
+        "default_branch": { "type": "string", "minLength": 1 },
+        "platform": { "enum": ["linux", "macos", "windows"] },
+        "labels": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "allowlist": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "native_repos": { "type": "array", "items": { "type": "string" } },
+        "native_labels": { "type": "array", "items": { "type": "string" } },
+        "trusted_repos": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "sources": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "jira": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["project", "repo"],
+            "properties": {
+              "project": { "type": "string", "minLength": 1 },
+              "repo": { "type": "string", "pattern": "^[^/]+/[^/]+$" },
+              "components": {
+                "type": "object",
+                "additionalProperties": { "type": "string", "pattern": "^[^/]+/[^/]+$" }
+              },
+              "platform": { "enum": ["linux", "macos", "windows"] },
+              "requires": { "type": "array", "items": { "type": "string" } },
+              "labels": { "type": "array", "items": { "type": "string" } },
+              "base_branch": { "type": "string", "minLength": 1 }
+            }
+          }
+        },
+        "linear": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["team", "repo"],
+            "properties": {
+              "team": { "type": "string", "minLength": 1 },
+              "repo": { "type": "string", "pattern": "^[^/]+/[^/]+$" },
+              "platform": { "enum": ["linux", "macos", "windows"] },
+              "requires": { "type": "array", "items": { "type": "string" } },
+              "labels": { "type": "array", "items": { "type": "string" } },
+              "base_branch": { "type": "string", "minLength": 1 }
+            }
+          }
+        },
+        "github": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "fallback_repo_from_issue": { "type": "boolean" },
+              "repo": { "type": "string", "pattern": "^[^/]+/[^/]+$" }
+            }
+          }
+        }
+      }
+    },
+    "coi": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "timeout_cap": { "type": "string", "pattern": "^([0-9]+h)?([0-9]+m)?([0-9]+s)?$" },
+        "allowed_domains": { "type": "array", "items": { "type": "string" } },
+        "limits": { "type": "object" },
+        "untrusted_profile": { "type": "string" }
+      }
+    },
+    "bot": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "email": { "type": "string", "minLength": 1 }
+      }
+    },
+    "native": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "macos": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "seatbelt_profile": { "type": "string" }
+          }
+        },
+        "windows": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "wrapper": { "type": "array", "items": { "type": "string" } }
+          }
+        }
+      }
+    }
+  }
+}

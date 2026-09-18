@@ -1,0 +1,35 @@
+{
+  "timestamp": 1700000000000,
+  "webhookEvent": "jira:issue_created",
+  "issue_event_type_name": "issue_created",
+  "user": { "displayName": "Ada Lovelace", "name": "ada" },
+  "issue": {
+    "id": "10001",
+    "self": "https://acme.atlassian.net/rest/api/2/issue/10001",
+    "key": "ENG-123",
+    "fields": {
+      "summary": "Backend returns 500 on /login",
+      "description": {
+        "type": "doc",
+        "version": 1,
+        "content": [
+          {
+            "type": "paragraph",
+            "content": [
+              { "type": "text", "text": "The login endpoint throws a 500 when the password contains a plus sign." }
+            ]
+          },
+          {
+            "type": "codeBlock",
+            "content": [{ "type": "text", "text": "POST /api/login -> 500" }]
+          }
+        ]
+      },
+      "issuetype": { "name": "Bug" },
+      "labels": ["agent", "backend"],
+      "project": { "key": "ENG" },
+      "components": [{ "name": "backend" }],
+      "reporter": { "displayName": "Ada Lovelace" }
+    }
+  }
+}

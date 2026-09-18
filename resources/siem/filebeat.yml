@@ -1,0 +1,50 @@
+# Filebeat: ship COI audit JSONL + OS logs to a SIEM (plan §10, P5).
+#
+# COI audit events are JSONL on the agent host. Ship them alongside host OS
+# audit logs so the panel's `coi audit` view and the SIEM agree.
+#
+# Install: copy to /etc/filebeat/filebeat.yml, set FLEET_SIEM_HOST, then
+#   sudo filebeat test config && sudo systemctl restart filebeat
+
+filebeat.inputs:
+  - type: filestream
+    id: coi-audit
+    enabled: true
+    paths:
+      - /home/*/.coi/audit/*.jsonl
+    parsers:
+      - ndjson:
+          target: ""
+          add_error_key: true
+    fields:
+      source: coi-audit
+    fields_under_root: true
+
+  # Linux OS audit trail (adjust path for your distro).
+  - type: filestream
+    id: os-audit
+    enabled: true
+    paths:
+      - /var/log/auth.log
+      - /var/log/audit/audit.log
+    fields:
+      source: os-audit
+    fields_under_root: true
+
+processors:
+  - add_host_metadata: ~
+  - add_fields:
+      target: fleet
+      fields:
+        agent_pool: linux-coi
+
+output.elasticsearch:
+  hosts: ["${FLEET_SIEM_HOST:?set FLEET_SIEM_HOST}"]
+  username: "${FLEET_SIEM_USER:fleet}"
+  password: "${FLEET_SIEM_PASSWORD:?set FLEET_SIEM_PASSWORD}"
+
+# Or ship to Logstash / a generic HTTP sink:
+# output.logstash:
+#   hosts: ["${FLEET_SIEM_HOST}:5044"]
+
+logging.level: warning

@@ -1,0 +1,26 @@
+{
+  "timestamp": 1700000001000,
+  "webhookEvent": "jira:issue_updated",
+  "issue_event_type_name": "issue_updated",
+  "user": { "displayName": "Grace Hopper", "name": "grace" },
+  "issue": {
+    "id": "10002",
+    "self": "https://acme.atlassian.net/rest/api/2/issue/10002",
+    "key": "ENG-124",
+    "fields": {
+      "summary": "Add rate limiting to the public API",
+      "description": "Cap unauthenticated requests at 60/min per IP.",
+      "issuetype": { "name": "Story" },
+      "labels": ["agent"],
+      "project": { "key": "ENG" },
+      "components": [{ "name": "web" }],
+      "reporter": { "displayName": "Grace Hopper" }
+    }
+  },
+  "changelog": {
+    "id": "20001",
+    "items": [
+      { "field": "labels", "fieldtype": "jira", "from": null, "fromString": null, "to": null, "toString": "agent" }
+    ]
+  }
+}

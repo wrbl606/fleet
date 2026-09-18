@@ -1,0 +1,24 @@
+{
+  "timestamp": 1700000002000,
+  "webhookEvent": "jira:issue_updated",
+  "issue_event_type_name": "issue_updated",
+  "issue": {
+    "id": "10003",
+    "self": "https://acme.atlassian.net/rest/api/2/issue/10003",
+    "key": "ENG-125",
+    "fields": {
+      "summary": "Just a comment",
+      "description": "No label change here.",
+      "issuetype": { "name": "Task" },
+      "labels": ["backend"],
+      "project": { "key": "ENG" },
+      "components": [],
+      "reporter": { "displayName": "Alan Turing" }
+    }
+  },
+  "changelog": {
+    "items": [
+      { "field": "comment", "fieldtype": "jira" }
+    ]
+  }
+}

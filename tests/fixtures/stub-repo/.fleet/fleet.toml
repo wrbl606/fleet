@@ -1,0 +1,27 @@
+version = 1
+
+[agent]
+tool           = "custom"
+command        = ["bash", "agent-stub.sh", "{{prompt}}"]
+max_iterations = 2
+prompt_file    = "prompts/task.md"
+
+[setup]
+script = "setup.sh"
+
+[verify]
+script = "verify.sh"
+
+[pr]
+branch_prefix = "fleet/"
+base          = "main"
+title         = "{{issue.key}}: {{issue.summary}}"
+labels        = ["agent"]
+body_file     = "pr-template.md"
+
+[platform]
+os = "linux"
+
+[coi]
+network = "restricted"
+timeout = "10m"

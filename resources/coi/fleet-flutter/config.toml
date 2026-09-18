@@ -1,0 +1,16 @@
+# COI profile: Flutter-enabled image for the fleet agent runner.
+#
+# Install + build on a runner host:
+#   mkdir -p ~/.coi/profiles && cp -r resources/coi/fleet-flutter ~/.coi/profiles/
+#   coi build --profile fleet-flutter
+#
+# Why an image (not setup.sh): the dispatcher runs setup/agent/verify as
+# separate ephemeral containers and only the workspace persists, so toolchains
+# like Flutter must be baked into the image.
+
+[container]
+image = "coi-fleet-flutter"
+
+[container.build]
+base = "coi-default"
+script = "build.sh"

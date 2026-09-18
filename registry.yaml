@@ -1,0 +1,77 @@
+# Central fLEET registry — trusted, versioned routing + allowlist.
+# Consumed by the dispatcher pipeline (see fleetctl/registry.py).
+# Schema: schemas/registry.schema.json
+#
+# This file ships generic examples so the project is reusable. Put
+# deployment-specific entries (your org's repos, Jira project keys, host paths)
+# in a local, git-ignored overlay: `registry.local.yaml`. fleetctl merges it
+# over this file when it sits next to it, or when FLEET_REGISTRY_LOCAL points
+# at it. Mappings merge; lists union; scalars are overridden.
+
+defaults:
+  github_org: acme
+  default_branch: main
+  platform: linux
+  labels: ["fleet-agent"]
+
+allowlist:                       # fail-closed gate for native (bare-metal) execution
+  native_repos: ["acme/ios-app", "acme/win-tool"]
+  native_labels: ["fleet-agent-macos", "fleet-agent-windows"]
+  # Repos here are considered trusted for sandbox purposes: they keep the
+  # repo-requested COI profile (or the default). Everything else gets
+  # coi.untrusted_profile below.
+  trusted_repos: ["acme/engine", "acme/engine-api", "acme/engine-web"]
+
+sources:
+  jira:
+    - project: "ENG"
+      repo: "acme/engine"
+      components: {backend: "acme/engine-api", web: "acme/engine-web"}
+    - project: "PLAT"
+      repo: "acme/platform"
+  linear:
+    - team: "core"
+      repo: "acme/core"
+  github:
+    - fallback_repo_from_issue: true
+
+# Trusted COI policy. Repo manifests may request a mode/timeout but can never
+# widen these resource caps or the allowlisted domain set.
+coi:
+  timeout_cap: "60m"
+  # Applied to repos not listed in allowlist.trusted_repos when the repo does
+  # not pin its own [coi].profile.
+  untrusted_profile: "hardened"
+  allowed_domains:
+    - api.anthropic.com
+    - platform.claude.com
+    - api.openai.com
+    - chatgpt.com
+    - opencode.ai
+    - models.dev
+    - registry.npmjs.org
+    - npm.pkg.github.com
+    - pypi.org
+    - files.pythonhosted.org
+    - github.com
+    - api.github.com
+    - codeload.github.com
+    - objects.githubusercontent.com
+    - raw.githubusercontent.com
+  limits:
+    cpu: {count: "2"}
+    memory: {limit: "4GiB", enforce: "hard"}
+    disk: {tmpfs_size: "2GiB"}
+    runtime: {auto_stop: true, stop_graceful: true}
+
+bot:
+  name: "fleet-agent[bot]"
+  email: "fleet-agent@users.noreply.github.com"
+
+# Trusted host-side OS sandbox for native (bare-metal) runs. These live in
+# fleet-config / on the host and are never sourced from the untrusted repo.
+native:
+  macos:
+    seatbelt_profile: "resources/native/seatbelt.sb"
+  windows:
+    wrapper: ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "resources/native/windows-sandbox.ps1", "--"]

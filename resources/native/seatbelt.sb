@@ -1,0 +1,48 @@
+;; fLEET Seatbelt profile for native macOS agent runs (plan §8, P4).
+;;
+;; Trusted host-side policy: this file lives in fleet-config and is passed to
+;; `sandbox-exec -D WORKSPACE=<workspace> -f seatbelt.sb <cmd>`. A repo can
+;; never supply or relax it.
+;;
+;; Model: deny by default, then allow the toolchain to read the system, write
+;; only inside the workspace + temp dirs, and reach the network (egress is
+;; further restricted by the host PF firewall — see scripts/hardening/macos.sh).
+
+(version 1)
+(deny default)
+
+;; --- process ---------------------------------------------------------------
+(allow process-exec*)
+(allow process-fork)
+(allow signal (target self))
+(allow sysctl-read)
+(allow mach-lookup)
+(allow ipc-posix-shm)
+
+;; --- system / toolchain (read-only) ---------------------------------------
+(allow file-read*
+  (subpath "/usr")
+  (subpath "/bin")
+  (subpath "/sbin")
+  (subpath "/System")
+  (subpath "/Library")
+  (subpath "/opt")
+  (subpath "/private/etc")
+  (subpath "/private/var/db")
+  (subpath "/dev"))
+
+;; --- temp dirs -------------------------------------------------------------
+(allow file-read* file-write*
+  (subpath "/private/tmp")
+  (subpath "/private/var/folders")
+  (subpath "/var/folders"))
+
+;; --- workspace (full read/write) ------------------------------------------
+(allow file-read* file-write*
+  (subpath (param "WORKSPACE")))
+
+;; --- network ---------------------------------------------------------------
+;; Broad outbound here; the host PF anchor enforces the LLM + package-registry
+;; allowlist at the network layer (defense in depth: sandbox, then firewall).
+(allow network-outbound)
+(allow network-inbound (local ip "localhost:*"))
