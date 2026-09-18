@@ -1,8 +1,28 @@
 # Plan: PR-comment trigger (`/agent`)
 
-Status: **implementing (P1/P2)**
+Status: **P1/P2 implemented; verified end-to-end via Jenkins**
 Owner: fleet
 Related: `docs/fleet-contract.md`, `docs/security.md`, `docs/runner-backends.md`
+
+## Implemented
+
+- GitHub normalizer (`issues`, `issue_comment`, `pull_request_review_comment`),
+  trusted prefix + author policy, bot filtering, PR enrichment for
+  `issue_comment`.
+- `Issue`/`RunPlan`/`FleetManifest[comment]` model, modes `new_pr | auto |
+  update_pr | answer`, fork → answer.
+- Publisher pushes agent-authored commits to the existing PR branch (explicit
+  fetch refspec, no force) and replies on the PR conversation.
+- Jenkins: GWT `X-GitHub-Event`/`X-GitHub-Delivery`, source inference, read-token
+  binding for enrichment, PR-head checkout, `disableConcurrentBuilds`.
+- Admin panel: run ledger persists `mode`/`comment_url`/`comment_command`/
+  `reply_url`; run detail shows them; Trigger page has a GitHub PR-comment preset.
+
+## Remaining
+
+- Idempotency/dedupe (comment id / `X-GitHub-Delivery`) and an ack reaction.
+- Per-branch concurrency lock (currently serialized job-wide).
+- Fork PRs are reply-only and run against the base checkout.
 
 ## Goal
 

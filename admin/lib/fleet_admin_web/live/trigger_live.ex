@@ -24,6 +24,41 @@ defmodule FleetAdminWeb.TriggerLive do
   }
   """
 
+  @sample_github_comment """
+  {
+    "action": "created",
+    "issue": {
+      "number": 14,
+      "title": "A pull request",
+      "pull_request": { "url": "https://api.github.com/repos/OWNER/REPO/pulls/14" },
+      "user": { "login": "you" }
+    },
+    "comment": {
+      "id": 1,
+      "body": "/agent describe what the agent should do",
+      "html_url": "https://github.com/OWNER/REPO/pull/14#issuecomment-1",
+      "author_association": "OWNER",
+      "user": { "login": "you", "type": "User" }
+    },
+    "repository": { "full_name": "OWNER/REPO" }
+  }
+  """
+
+  defp presets do
+    %{
+      "jira" => %{
+        "source" => "jira",
+        "event" => "jira:issue_created",
+        "payload" => @sample_jira
+      },
+      "github_pr_comment" => %{
+        "source" => "github",
+        "event" => "issue_comment",
+        "payload" => @sample_github_comment
+      }
+    }
+  end
+
   @impl true
   def mount(_params, _session, socket) do
     {:ok,
@@ -63,6 +98,21 @@ defmodule FleetAdminWeb.TriggerLive do
          socket
          |> assign(:result, {:error, reason})
          |> put_flash(:error, "Trigger failed: " <> format_reason(reason))}
+    end
+  end
+
+  def handle_event("preset", %{"kind" => kind}, socket) do
+    case presets()[kind] do
+      nil ->
+        {:noreply, socket}
+
+      preset ->
+        {:noreply,
+         socket
+         |> assign(:endpoint, Trigger.endpoint(preset["source"]))
+         |> assign(:json_error, nil)
+         |> assign(:result, nil)
+         |> assign_form(preset)}
     end
   end
 
@@ -129,6 +179,28 @@ defmodule FleetAdminWeb.TriggerLive do
       <p :if={@configured?} class="mb-4 text-sm text-base-content/70">
         Endpoint: <code id="trigger-endpoint">{@endpoint}</code>
       </p>
+
+      <div class="mb-4 flex items-center gap-2">
+        <span class="text-sm text-base-content/70">Preset:</span>
+        <button
+          id="preset-jira"
+          type="button"
+          class="btn btn-sm btn-outline"
+          phx-click="preset"
+          phx-value-kind="jira"
+        >
+          Jira issue
+        </button>
+        <button
+          id="preset-github-comment"
+          type="button"
+          class="btn btn-sm btn-outline"
+          phx-click="preset"
+          phx-value-kind="github_pr_comment"
+        >
+          GitHub PR comment
+        </button>
+      </div>
 
       <.form for={@form} id="trigger-form" phx-change="validate" phx-submit="submit" class="space-y-4">
         <.input

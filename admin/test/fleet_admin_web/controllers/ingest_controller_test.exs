@@ -19,6 +19,28 @@ defmodule FleetAdminWeb.IngestControllerTest do
     assert %{"ok" => true, "id" => _id} = json_response(conn, 201)
   end
 
+  test "persists PR-comment fields", %{conn: conn} do
+    payload = %{
+      "event" => "run.finished",
+      "issue" => %{"source" => "github", "key" => "o/r#14"},
+      "repo" => "o/r",
+      "branch" => "feature/x",
+      "status" => "succeeded",
+      "mode" => "auto",
+      "comment_url" => "https://github.com/o/r/pull/14#issuecomment-1",
+      "comment_command" => "/agent fix it",
+      "reply_url" => "https://github.com/o/r/pull/14#issuecomment-2"
+    }
+
+    conn = conn |> authed() |> post(~p"/api/ingest", payload)
+    assert %{"ok" => true, "id" => id} = json_response(conn, 201)
+
+    run = FleetAdmin.Ledger.get_run!(id)
+    assert run.mode == "auto"
+    assert run.comment_command == "/agent fix it"
+    assert run.reply_url =~ "issuecomment-2"
+  end
+
   test "rejects unknown events", %{conn: conn} do
     conn = conn |> authed() |> post(~p"/api/ingest", %{"event" => "nope"})
     assert %{"ok" => false} = json_response(conn, 422)

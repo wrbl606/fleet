@@ -82,6 +82,16 @@ defmodule FleetAdminWeb.TriggerLiveTest do
     refute has_element?(view, "#jenkins-master")
   end
 
+  test "loads the GitHub PR comment preset", %{conn: conn} do
+    {:ok, view, _html} = live(conn, ~p"/trigger")
+
+    html = view |> element("#preset-github-comment") |> render_click()
+
+    assert html =~ "issue_comment"
+    assert html =~ "/agent"
+    assert html =~ "github"
+  end
+
   test "shows the unconfigured banner when no endpoint is set", %{conn: conn} do
     previous = Application.get_env(:fleet_admin, :fleet_webhook_url)
     Application.put_env(:fleet_admin, :fleet_webhook_url, nil)

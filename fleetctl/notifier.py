@@ -61,7 +61,7 @@ def post_run_finished(plan: RunPlan, result: RunResult) -> bool:
         "reply_url": result.reply_url,
         "mode": plan.mode,
         "comment_url": plan.issue.comment_url,
-        "comment_body": plan.issue.command or plan.issue.comment_body,
+        "comment_command": plan.issue.command or plan.issue.comment_body,
         "tool": plan.manifest.agent.tool,
         "iterations": [i.to_dict() for i in result.iterations],
         "error": result.error,

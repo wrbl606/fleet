@@ -14,6 +14,10 @@ defmodule FleetAdmin.Ledger.Run do
     field :branch, :string
     field :commit, :string
     field :pr_url, :string
+    field :reply_url, :string
+    field :mode, :string
+    field :comment_url, :string
+    field :comment_command, :string
     field :status, :string, default: "running"
     field :tool, :string
     field :platform, :string
@@ -43,6 +47,10 @@ defmodule FleetAdmin.Ledger.Run do
       :branch,
       :commit,
       :pr_url,
+      :reply_url,
+      :mode,
+      :comment_url,
+      :comment_command,
       :status,
       :tool,
       :platform,

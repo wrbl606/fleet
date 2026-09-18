@@ -70,7 +70,20 @@ defmodule FleetAdminWeb.RunLive.Show do
 
       <.list>
         <:item title="Source">{@run.source || "—"}</:item>
+        <:item title="Mode">{@run.mode || "—"}</:item>
         <:item title="Branch">{@run.branch || "—"}</:item>
+        <:item title="Comment">
+          <.link
+            :if={@run.comment_url}
+            href={@run.comment_url}
+            target="_blank"
+            rel="noopener"
+            class="link link-primary"
+          >
+            {@run.comment_command || "comment"}
+          </.link>
+          <span :if={!@run.comment_url}>—</span>
+        </:item>
         <:item title="Tool">{@run.tool || "—"}</:item>
         <:item title="Platform">{@run.platform || "—"}</:item>
         <:item title="Started">{format_ts(@run.started_at)}</:item>
@@ -80,6 +93,18 @@ defmodule FleetAdminWeb.RunLive.Show do
             {@run.pr_url}
           </.link>
           <span :if={!@run.pr_url}>—</span>
+        </:item>
+        <:item title="Reply">
+          <.link
+            :if={@run.reply_url}
+            href={@run.reply_url}
+            target="_blank"
+            rel="noopener"
+            class="link link-primary"
+          >
+            reply
+          </.link>
+          <span :if={!@run.reply_url}>—</span>
         </:item>
         <:item title="Jenkins build">
           <.link
