@@ -154,6 +154,100 @@ Install the plugins in `scripts/jenkins/plugins.txt`, then:
 Point the admin panel's Trigger page at the same invoke URL via
 `FLEET_WEBHOOK_URL` / `FLEET_WEBHOOK_TOKEN`.
 
+## Upgrading host machines
+
+fleet is not installed as a package: a host runs from a **git checkout** plus a
+**state dir** (`$FLEET_JENKINS_STATE_DIR`, default
+`~/.local/share/fleet/jenkins/`) and external tools (Incus/`coi`, Jenkins,
+`mise`). Upgrading is therefore: *pull → refresh derived state → migrate →
+restart → re-register*. Run every step on each host that executes the
+corresponding role.
+
+**0. Preflight / backup** — record the current revision and back up local,
+unversioned state before touching anything:
+
+```bash
+git -C /path/to/fleet rev-parse HEAD
+cp -a "$HOME/.local/share/fleet/jenkins"  "$HOME/.local/share/fleet/jenkins.bak.$(date +%s)"
+cp -a /path/to/fleet/registry.local.yaml  "$HOME/registry.local.yaml.bak"   # git-ignored
+cp -a /path/to/fleet/admin/fleet_admin_dev.db "$HOME/fleet_admin_dev.db.bak" # if SQLite
+```
+
+**1. Dispatcher core (`fleetctl`)** — on every build node:
+
+```bash
+git -C /path/to/fleet fetch --tags
+git -C /path/to/fleet checkout <tag-or-main>
+python3 -m pip install -r /path/to/fleet/requirements.txt   # deps may change
+python3 -m fleetctl env-check --platform linux
+```
+
+**2. Trusted config** — `git pull` updates `registry.yaml`/schemas; the
+git-ignored `registry.local.yaml` overlay is untouched. Re-validate:
+
+```bash
+python3 -m fleetctl validate --registry registry.yaml --repo-dir <repo> --coi
+```
+
+**3. COI images (Linux/COI nodes)** — refresh the runtime and rebuild images so
+toolchain changes land:
+
+```bash
+coi update && coi health
+coi build                              # base image
+coi build --profile fleet-flutter      # each custom profile in use
+```
+
+If an earlier version left `chattr +i` behind, clear it (fleet now sets
+`host_immutable=false`): `sudo chattr -R -i ~/.coi` and any workspace `.git`
+that is immutable.
+
+**4. Jenkins**
+
+*Local WAR install (Option A):*
+
+```bash
+bash scripts/jenkins/setup.sh          # refresh jenkins.war + plugins
+bash scripts/jenkins/prepare-local.sh  # refresh the fleet-config-git snapshot
+bash scripts/jenkins/start.sh --jenkins-url "$JENKINS_URL"   # same env/secrets as before
+```
+
+Restarting drops the Generic Webhook Trigger, so run the job once (**Build
+now**) to re-register it, then resume the webhook.
+
+*Your own Jenkins (Option B):* update the `fleet-config` shared-library SCM and
+the plugins from `scripts/jenkins/plugins.txt`, then rebuild/re-run.
+
+**5. Admin panel** — install the pinned toolchain, migrate **before**
+restarting, then start:
+
+```bash
+mise install
+cd admin && mix deps.get && mix ecto.migrate
+bash admin/start.sh --host 0.0.0.0 --port 4000
+```
+
+Migrations are additive, so the running panel keeps serving during a pull.
+
+**6. Verify after upgrade**
+
+```bash
+bash scripts/ci.sh          # fleetctl + schema validation
+bash scripts/ci-admin.sh    # admin compile/format/tests
+bash scripts/p0-smoke.sh    # sandbox smoke (no LLM key)
+```
+
+Then a real smoke through the flow: use the panel **Trigger** page (or
+`POST /api/trigger`) and confirm a run appears in the ledger and a build in
+Jenkins.
+
+**7. Rollback** — `git checkout <previous-rev>`, re-run `prepare-local.sh`,
+restart Jenkins/panel, and `mix ecto.rollback` the panel migration if needed;
+restore the state-dir and DB backups from step 0.
+
+> Secrets never live in git. Keep the host's `secrets.env` (chmod 600) across
+> upgrades and rotate any token whose scope changed with the release.
+
 ## Contributing
 
 ### Ground rules

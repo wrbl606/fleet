@@ -38,6 +38,8 @@ def call(Map cfg = [:]) {
   String dispatcherNode = cfg.dispatcherNode ?: 'built-in'
   String readCred = cfg.readTokenCredentialId ?: 'fleet-github-read'
 
+  echo "fleet: trigger source=${source} event=${event} registry=${registryPath}"
+
   boolean actionable = false
   Map plan = null
   Map issue = null

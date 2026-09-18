@@ -20,6 +20,7 @@ defmodule FleetAdminWeb.Router do
     pipe_through :api
 
     post "/ingest", IngestController, :create
+    post "/trigger", TriggerController, :create
     get "/metrics", MetricsController, :show
   end
 
