@@ -65,6 +65,37 @@ defmodule FleetAdmin.LedgerTest do
     assert length(details.iterations) == 1
   end
 
+  test "separates PR-comment runs by comment id" do
+    base = %{
+      "event" => "run.finished",
+      "issue" => %{"source" => "github", "key" => "o/r#14", "comment_id" => 1},
+      "repo" => "o/r",
+      "branch" => "feature/x",
+      "status" => "succeeded"
+    }
+
+    assert {:ok, first} = Ledger.ingest_event(base)
+    assert {:ok, second} = Ledger.ingest_event(put_in(base, ["issue", "comment_id"], 2))
+
+    assert first.id != second.id
+    assert first.external_id =~ "#c1"
+    assert second.external_id =~ "#c2"
+  end
+
+  test "honours an explicit external_id" do
+    assert {:ok, run} =
+             Ledger.ingest_event(%{
+               "event" => "run.finished",
+               "external_id" => "custom-1",
+               "issue" => %{"key" => "X"},
+               "repo" => "a/b",
+               "branch" => "b",
+               "status" => "succeeded"
+             })
+
+    assert run.external_id == "custom-1"
+  end
+
   test "ingests run.started" do
     assert {:ok, run} =
              Ledger.ingest_event(%{

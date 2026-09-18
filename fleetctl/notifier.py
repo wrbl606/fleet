@@ -46,6 +46,20 @@ def notify_issue(plan: RunPlan, message: str) -> bool:
     return _post(url, payload, headers={"Authorization": f"Basic {auth}"})
 
 
+def external_id(plan: RunPlan) -> str:
+    """Stable run identity.
+
+    Includes the triggering comment id for ``pr_comment`` runs so successive
+    ``/agent`` comments on the same PR are recorded as separate runs.
+    """
+    repo = plan.repo or plan.resolution.repo
+    branch = plan.branch()
+    key = plan.issue.key
+    if plan.issue.is_pr_comment and plan.issue.comment_id:
+        return f"{repo}#{key}@{branch}#c{plan.issue.comment_id}"
+    return f"{repo}#{key}@{branch}"
+
+
 def post_run_finished(plan: RunPlan, result: RunResult) -> bool:
     """POST a run-finished event to the admin panel ingest API, if configured."""
     url = os.environ.get("FLEET_INGEST_URL")
@@ -53,6 +67,7 @@ def post_run_finished(plan: RunPlan, result: RunResult) -> bool:
         return False
     payload: dict[str, Any] = {
         "event": "run.finished",
+        "external_id": external_id(plan),
         "issue": plan.issue.to_dict(),
         "repo": result.repo,
         "branch": result.branch,

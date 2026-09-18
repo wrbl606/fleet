@@ -198,11 +198,20 @@ defmodule FleetAdmin.Ledger do
         key = get_in(payload, ["issue", "key"]) || payload["issue_key"]
         repo = payload["repo"]
         branch = payload["branch"]
+        comment_id = get_in(payload, ["issue", "comment_id"]) || payload["comment_id"]
 
         cond do
-          key && repo && branch -> "#{repo}##{key}@#{branch}"
-          key && repo -> "#{repo}##{key}"
-          true -> nil
+          key && repo && branch && comment_id ->
+            "#{repo}##{key}@#{branch}#c#{comment_id}"
+
+          key && repo && branch ->
+            "#{repo}##{key}@#{branch}"
+
+          key && repo ->
+            "#{repo}##{key}"
+
+          true ->
+            nil
         end
     end
   end
