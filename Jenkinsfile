@@ -17,7 +17,9 @@ properties([
         [key: 'source', regexpFilter: '']
       ],
       genericHeaderVariables: [
-        [key: 'x-fleet-event', regexpFilter: '']
+        [key: 'x-fleet-event', regexpFilter: ''],
+        [key: 'x-github-event', regexpFilter: ''],
+        [key: 'x-github-delivery', regexpFilter: '']
       ],
       tokenCredentialId: 'fleet-webhook-token',
       causeString: 'Fleet webhook ($source)',

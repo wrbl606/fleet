@@ -51,6 +51,12 @@ arch     = "amd64"
 profile = ""                         # empty -> built-in COI default
 network = "restricted"               # restricted | allowlist | open
 timeout = "30m"                      # clamped to registry.coi.timeout_cap
+
+[comment]                            # optional; PR-comment trigger behavior
+enabled   = true                     # whether /agent comments run this repo
+mode      = "auto"                   # auto | code | answer
+reply     = true                     # post a comment back on the PR
+reply_file = "reply.md"              # agent-written reply, else a summary
 ```
 
 Notes:
@@ -76,10 +82,28 @@ Notes:
 {{issue.labels}} {{issue.project}} {{issue.component}} {{issue.team}}
 {{issue.reporter}} {{issue.url}}
 {{source}} {{repo}} {{platform}} {{pr.title}}
+{{mode}} {{pr.number}} {{pr.url}} {{pr.head_branch}} {{pr.base_branch}}
+{{pr.head_repo}}
+{{comment.body}} {{comment.command}} {{comment.author}} {{comment.url}}
 ```
 
 Unknown expressions fail the run (strict mode) rather than shipping a blank
 instruction. `{{issue.labels}}` renders as a comma-joined list.
+
+### PR-comment triggers
+
+A GitHub `issue_comment` (or `pull_request_review_comment`) whose body starts
+with the trusted prefix (`/agent` by default) starts a run against the PR's
+existing branch. `[comment].mode` selects the behavior:
+
+- `auto` (default) — reply always; push a commit to the PR branch only if the
+  agent changed files.
+- `code` — require a change and push.
+- `answer` — reply only, never touch git.
+
+The prefix and **who may trigger** (`OWNER`/`MEMBER`/`COLLABORATOR` plus a user
+allowlist) live in the trusted `registry.yaml` (`sources.github`), not here.
+Fork PRs are reply-only. See [`plans/pr-comment-trigger.md`](./plans/pr-comment-trigger.md).
 
 ## Validation
 

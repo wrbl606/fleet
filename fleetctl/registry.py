@@ -129,6 +129,13 @@ class Registry:
     jira: list[dict[str, Any]] = field(default_factory=list)
     linear: list[dict[str, Any]] = field(default_factory=list)
     github: dict[str, Any] = field(default_factory=dict)
+    #: Trusted PR-comment trigger policy (never repo-controlled).
+    github_comment_prefix: str = "/agent"
+    github_comment_associations: list[str] = field(
+        default_factory=lambda: ["OWNER", "MEMBER", "COLLABORATOR"]
+    )
+    github_comment_allow_users: list[str] = field(default_factory=list)
+    github_comment_bot_logins: list[str] = field(default_factory=list)
     coi: CoiDefaults = field(default_factory=CoiDefaults)
     bot_name: str = "fleet-agent[bot]"
     bot_email: str = "fleet-agent@users.noreply.github.com"
@@ -199,6 +206,20 @@ class Registry:
             jira=list(sources.get("jira", [])),
             linear=list(sources.get("linear", [])),
             github=dict(github_raw),
+            github_comment_prefix=github_raw.get("comment_prefix", "/agent"),
+            github_comment_associations=[
+                str(x).upper()
+                for x in github_raw.get(
+                    "comment_author_associations",
+                    ["OWNER", "MEMBER", "COLLABORATOR"],
+                )
+            ],
+            github_comment_allow_users=[
+                str(x) for x in github_raw.get("comment_allow_users", [])
+            ],
+            github_comment_bot_logins=[
+                str(x) for x in github_raw.get("comment_bot_logins", [])
+            ],
             coi=coi,
             bot_name=bot.get("name", "fleet-agent[bot]"),
             bot_email=bot.get("email", "fleet-agent@users.noreply.github.com"),

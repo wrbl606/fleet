@@ -42,13 +42,13 @@ def execute(
     dry_run: bool = False,
     notify: bool = True,
 ) -> RunResult:
-    from .planner import render_pr_body
-    from .publisher import publish as do_publish
+    from .planner import render_comment_reply, render_pr_body
+    from .publisher import changed_files, publish as do_publish
 
     result = RunResult(
         status="failed",
         repo=plan.repo,
-        branch=branch_name(plan),
+        branch=plan.branch(),
         # Jenkins sets these in the build environment; absent for local runs.
         build_url=os.environ.get("BUILD_URL"),
         build_number=_build_number(os.environ.get("BUILD_NUMBER")),
@@ -102,7 +102,11 @@ def execute(
             return result
 
         if publish_enabled:
-            body = render_pr_body(plan, workspace)
+            files = changed_files(executor, workspace)
+            if plan.issue.is_pr_comment:
+                body = render_comment_reply(plan, workspace, files)
+            else:
+                body = render_pr_body(plan, workspace)
             pub = do_publish(
                 plan,
                 workspace,
@@ -115,6 +119,7 @@ def execute(
             result.status = pub.status
             result.pr_url = pub.pr_url
             result.branch = pub.branch
+            result.reply_url = pub.reply_url
             result.artifacts["changed_files"] = pub.changed_files
         else:
             result.status = "succeeded"

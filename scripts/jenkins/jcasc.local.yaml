@@ -38,6 +38,10 @@ jenkins:
             value: "http://localhost:4000/api/ingest"
           - key: "FLEET_INGEST_TOKEN"
             value: "local-dev-token"
+          # Optional, git-ignored overlay with deployment-specific repos/projects
+          # (e.g. allowlist.trusted_repos). Absolute host path; empty disables.
+          - key: "FLEET_REGISTRY_LOCAL"
+            value: "${FLEET_REGISTRY_LOCAL:-}"
 
 unclassified:
   location:

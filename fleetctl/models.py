@@ -58,6 +58,32 @@ class Issue:
     repo_hint: Optional[str] = None
     event: str = ""
 
+    #: "issue" for a PM task, "pr_comment" for a PR-comment trigger.
+    kind: str = "issue"
+    pr_number: Optional[int] = None
+    pr_head_branch: Optional[str] = None
+    pr_base_branch: Optional[str] = None
+    #: ``owner/name`` of the head repo, which differs from the base repo on forks.
+    pr_head_repo: Optional[str] = None
+    pr_state: Optional[str] = None
+    comment_id: Optional[int] = None
+    comment_url: Optional[str] = None
+    comment_body: Optional[str] = None
+    #: The instruction parsed from the comment (text after the prefix).
+    command: Optional[str] = None
+    author: Optional[str] = None
+    author_association: Optional[str] = None
+
+    @property
+    def is_pr_comment(self) -> bool:
+        return self.kind == "pr_comment"
+
+    @property
+    def is_fork(self) -> bool:
+        if not self.pr_head_repo or not self.repo_hint:
+            return False
+        return self.pr_head_repo.lower() != self.repo_hint.lower()
+
     def to_dict(self) -> dict[str, Any]:
         return {
             "source": self.source,
@@ -73,6 +99,18 @@ class Issue:
             "url": self.url,
             "repo_hint": self.repo_hint,
             "event": self.event,
+            "kind": self.kind,
+            "pr_number": self.pr_number,
+            "pr_head_branch": self.pr_head_branch,
+            "pr_base_branch": self.pr_base_branch,
+            "pr_head_repo": self.pr_head_repo,
+            "pr_state": self.pr_state,
+            "comment_id": self.comment_id,
+            "comment_url": self.comment_url,
+            "comment_body": self.comment_body,
+            "command": self.command,
+            "author": self.author,
+            "author_association": self.author_association,
         }
 
     @classmethod
@@ -91,6 +129,18 @@ class Issue:
             url=data.get("url", ""),
             repo_hint=data.get("repo_hint"),
             event=data.get("event", ""),
+            kind=data.get("kind", "issue"),
+            pr_number=data.get("pr_number"),
+            pr_head_branch=data.get("pr_head_branch"),
+            pr_base_branch=data.get("pr_base_branch"),
+            pr_head_repo=data.get("pr_head_repo"),
+            pr_state=data.get("pr_state"),
+            comment_id=data.get("comment_id"),
+            comment_url=data.get("comment_url"),
+            comment_body=data.get("comment_body"),
+            command=data.get("command"),
+            author=data.get("author"),
+            author_association=data.get("author_association"),
         )
 
 
@@ -151,6 +201,25 @@ class PrSpec:
 
 
 @dataclass
+class CommentSpec:
+    """PR-comment trigger behavior (repo-controlled; policy lives in registry)."""
+
+    enabled: bool = True
+    #: auto | code | answer
+    mode: str = "auto"
+    reply: bool = True
+    reply_file: str = "reply.md"
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "enabled": self.enabled,
+            "mode": self.mode,
+            "reply": self.reply,
+            "reply_file": self.reply_file,
+        }
+
+
+@dataclass
 class PlatformSpec:
     os: str = "linux"
     requires: list[str] = field(default_factory=list)
@@ -187,6 +256,7 @@ class FleetManifest:
     pr: PrSpec = field(default_factory=PrSpec)
     platform: PlatformSpec = field(default_factory=PlatformSpec)
     coi: CoiSpec = field(default_factory=CoiSpec)
+    comment: CommentSpec = field(default_factory=CommentSpec)
 
     # -- validation ---------------------------------------------------------
     def validate(self) -> None:
@@ -224,6 +294,14 @@ class FleetManifest:
                 raise ValidationError(f"[{name}] must be a repo-relative path: {rel!r}")
         if not self.pr.branch_prefix:
             raise ValidationError("[pr].branch_prefix must not be empty")
+        if self.comment.mode not in ("auto", "code", "answer"):
+            raise ValidationError(
+                f"[comment].mode must be one of auto, code, answer; got {self.comment.mode!r}"
+            )
+        if not _is_safe_relpath(self.comment.reply_file):
+            raise ValidationError(
+                f"[comment].reply_file must be a repo-relative path: {self.comment.reply_file!r}"
+            )
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -234,6 +312,7 @@ class FleetManifest:
             "pr": self.pr.to_dict(),
             "platform": self.platform.to_dict(),
             "coi": self.coi.to_dict(),
+            "comment": self.comment.to_dict(),
         }
 
     @classmethod
@@ -244,6 +323,7 @@ class FleetManifest:
         pr = data.get("pr", {}) or {}
         platform = data.get("platform", {}) or {}
         coi = data.get("coi", {}) or {}
+        comment = data.get("comment", {}) or {}
         manifest = cls(
             version=int(data.get("version", 1)),
             agent=AgentSpec(
@@ -274,6 +354,12 @@ class FleetManifest:
                 network=coi.get("network", "restricted"),
                 timeout=coi.get("timeout", "30m"),
                 allowed_domains=list(coi.get("allowed_domains", [])),
+            ),
+            comment=CommentSpec(
+                enabled=bool(comment.get("enabled", True)),
+                mode=comment.get("mode", "auto"),
+                reply=bool(comment.get("reply", True)),
+                reply_file=comment.get("reply_file", "reply.md"),
             ),
         )
         manifest.validate()
@@ -357,6 +443,24 @@ class RunPlan:
     coi_config: dict[str, Any]
     coi_config_toml: str
     repo: str = ""
+    #: new_pr | auto | update_pr | answer
+    mode: str = "new_pr"
+    head_branch: Optional[str] = None
+    pr_number: Optional[int] = None
+    pr_url: Optional[str] = None
+    comment_id: Optional[int] = None
+
+    @property
+    def update_existing_branch(self) -> bool:
+        return self.mode in ("auto", "update_pr")
+
+    def branch(self) -> str:
+        """Branch the run targets: the PR head for comment triggers."""
+        if self.update_existing_branch and self.head_branch:
+            return self.head_branch
+        from .publisher import branch_name
+
+        return branch_name(self)
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -369,6 +473,11 @@ class RunPlan:
             "coi_config": self.coi_config,
             "coi_config_toml": self.coi_config_toml,
             "repo": self.repo or self.resolution.repo,
+            "mode": self.mode,
+            "head_branch": self.head_branch,
+            "pr_number": self.pr_number,
+            "pr_url": self.pr_url,
+            "comment_id": self.comment_id,
         }
 
     @classmethod
@@ -383,6 +492,11 @@ class RunPlan:
             coi_config=data.get("coi_config", {}),
             coi_config_toml=data.get("coi_config_toml", ""),
             repo=data.get("repo", ""),
+            mode=data.get("mode", "new_pr"),
+            head_branch=data.get("head_branch"),
+            pr_number=data.get("pr_number"),
+            pr_url=data.get("pr_url"),
+            comment_id=data.get("comment_id"),
         )
 
 
@@ -430,6 +544,7 @@ class RunResult:
     repo: str
     branch: str
     pr_url: Optional[str] = None
+    reply_url: Optional[str] = None
     iterations: list[IterationRecord] = field(default_factory=list)
     error: Optional[str] = None
     error_code: Optional[str] = None
@@ -448,6 +563,7 @@ class RunResult:
             "repo": self.repo,
             "branch": self.branch,
             "pr_url": self.pr_url,
+            "reply_url": self.reply_url,
             "iterations": [i.to_dict() for i in self.iterations],
             "error": self.error,
             "error_code": self.error_code,

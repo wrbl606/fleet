@@ -107,7 +107,13 @@ def build_coi_config(
             ".git-credentials",
             "secrets/**",
         ],
-        "host_immutable": True,
+        # COI still mounts protected paths (incl. .git/config, .git/hooks)
+        # read-only inside the sandbox, so the agent cannot tamper with them.
+        # host_immutable additionally sets chattr +i on the host, which only
+        # root/COI can clear; the trusted host-side publisher then can neither
+        # write identity nor let the next clone remove the workspace. Keep it
+        # off — the publisher also avoids writing .git/config.
+        "host_immutable": False,
     }
 
     cfg["git"] = {

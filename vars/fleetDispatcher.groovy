@@ -29,9 +29,14 @@ def call(Map cfg = [:]) {
   if (!payload) {
     error('fleet: no webhook payload (expected GWT variable "payload")')
   }
-  String source = (env.source ?: cfg.defaultSource ?: 'jira').trim()
-  String event = (env.x_fleet_event ?: env['x-fleet-event'] ?: env.FLEET_EVENT ?: '').trim()
+  String ghEvent = (env.x_github_event ?: env['x-github-event'] ?: '').trim()
+  String source = resolveSource(cfg, ghEvent)
+  // For GitHub the actionable event name is the X-GitHub-Event value.
+  String event = (source == 'github' && ghEvent)
+    ? ghEvent
+    : (env.x_fleet_event ?: env['x-fleet-event'] ?: env.FLEET_EVENT ?: '').trim()
   String dispatcherNode = cfg.dispatcherNode ?: 'built-in'
+  String readCred = cfg.readTokenCredentialId ?: 'fleet-github-read'
 
   boolean actionable = false
   Map plan = null
@@ -43,10 +48,17 @@ def call(Map cfg = [:]) {
       withEnv(["PYTHONPATH=${env.WORKSPACE}"]) {
         bootstrapPython()
         writeFile file: 'payload.json', text: payload
-        def raw = sh(
-          script: "python3 -m fleetctl normalize --source ${source} --payload-file payload.json --event '${event}'",
-          returnStdout: true
-        ).trim()
+        def cmd = "python3 -m fleetctl normalize --source ${source} " +
+          "--payload-file payload.json --event '${event}' --registry ${registryPath}"
+        def raw
+        if (source == 'github') {
+          // Bind the read token so issue_comment PR metadata can be fetched.
+          withCredentials([string(credentialsId: readCred, variable: 'GH_TOKEN')]) {
+            raw = sh(script: cmd, returnStdout: true).trim()
+          }
+        } else {
+          raw = sh(script: cmd, returnStdout: true).trim()
+        }
         def norm = parseJson(raw)
         if (norm.actionable) {
           actionable = true
@@ -103,10 +115,34 @@ def call(Map cfg = [:]) {
         }
 
         // Build the plan on the worker (manifest comes from the cloned repo).
-        sh "python3 -m fleetctl plan --registry ${registryPath} --repo-dir target --issue-file issue.json --out plan.json"
+        def planCmd = "python3 -m fleetctl plan --registry ${registryPath} " +
+          "--repo-dir target --issue-file issue.json --out plan.json"
+        if (source == 'github') {
+          withCredentials([string(credentialsId: readCred, variable: 'GH_TOKEN')]) {
+            sh planCmd
+          }
+        } else {
+          sh planCmd
+        }
         // Parse with JsonSlurperClassic (plain HashMaps / real nulls) rather than
         // readJSON, whose net.sf.json JSONNull breaks withCredentials bindings.
         def workerPlan = parseJson(readFile('plan.json'))
+
+        // PR-comment runs operate on the PR's existing head branch.
+        def headBranch = workerPlan.head_branch
+        def headRepo = workerPlan.issue?.pr_head_repo
+        def sameRepo = !headRepo || headRepo == plan.repo
+        if (headBranch && sameRepo &&
+            (workerPlan.mode == 'auto' || workerPlan.mode == 'update_pr')) {
+          withEnv(["FLEET_HEAD=${headBranch}"]) {
+            sh '''
+              set -e
+              cd target
+              git fetch --depth 1 origin "$FLEET_HEAD"
+              git checkout -B "$FLEET_HEAD" FETCH_HEAD
+            '''
+          }
+        }
 
         def llmEnv = workerPlan.manifest.agent.llm_env
         def llmCred = workerPlan.manifest.agent.llm_credential_id ?: llmEnv
@@ -141,6 +177,16 @@ def call(Map cfg = [:]) {
       }
     }
   }
+}
+
+def resolveSource(Map cfg, String ghEvent) {
+  def explicit = (env.source ?: '').trim()
+  if (explicit) return explicit
+  // GitHub webhooks carry no `source` query param; infer from the event header.
+  if (ghEvent in ['issues', 'issue_comment', 'pull_request_review_comment', 'pull_request']) {
+    return 'github'
+  }
+  return (cfg.defaultSource ?: 'jira').trim()
 }
 
 def bootstrapPython() {

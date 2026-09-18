@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import os
 import re
+import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Mapping, Optional
@@ -48,6 +49,7 @@ class PublishResult:
     branch: str
     pr_url: Optional[str] = None
     changed_files: list[str] = field(default_factory=list)
+    reply_url: Optional[str] = None
 
     def to_dict(self) -> dict:
         return {
@@ -55,6 +57,7 @@ class PublishResult:
             "branch": self.branch,
             "pr_url": self.pr_url,
             "changed_files": self.changed_files,
+            "reply_url": self.reply_url,
         }
 
 
@@ -90,19 +93,40 @@ def publish(
     base_branch: Optional[str] = None,
     dry_run: bool = False,
 ) -> PublishResult:
-    branch = branch_name(plan)
     base = base_branch or plan.manifest.pr.base
+    branch = plan.branch()
+    wants_reply = (
+        plan.issue.is_pr_comment and plan.manifest.comment.reply and bool(body)
+    )
 
     # Keep agent/COI runtime artifacts out of the commit (host-side, untracked).
     _write_runtime_excludes(workspace)
 
     files = changed_files(executor, workspace)
-    if not files:
+
+    if plan.mode == "new_pr" and not files:
         return PublishResult(status="no_changes", branch=branch)
+
+    # Reply-only path: forced ``answer`` mode, or ``auto`` with nothing to push.
+    if plan.mode == "answer" or (plan.mode == "auto" and not files):
+        reply_url = None
+        if wants_reply and not dry_run:
+            reply_url = _comment_on_pr(plan, body, _token_env(), executor, workspace)
+        status = "succeeded" if (wants_reply or files) else "no_changes"
+        return PublishResult(
+            status=status,
+            branch=branch,
+            pr_url=plan.pr_url,
+            changed_files=files,
+            reply_url=reply_url,
+        )
 
     if dry_run:
         return PublishResult(
-            status="succeeded", branch=branch, pr_url="(dry-run)", changed_files=files
+            status="succeeded",
+            branch=branch,
+            pr_url=plan.pr_url or "(dry-run)",
+            changed_files=files,
         )
 
     env = _token_env()
@@ -114,29 +138,123 @@ def publish(
                 f"{name} failed (exit {res.exit_code}): {res.stderr.strip() or res.stdout.strip()}"
             )
 
-    run(
-        ["git", "config", "user.name", bot_name],
-        name="git config user.name",
-        timeout=30,
-    )
-    run(
-        ["git", "config", "user.email", bot_email],
-        name="git config user.email",
-        timeout=30,
-    )
-    run(["git", "checkout", "-B", branch], name="git checkout")
+    if plan.update_existing_branch and plan.head_branch:
+        # Act on an existing PR: fetch the head branch and append (no force).
+        run(
+            ["git", "fetch", "--depth", "50", "origin", plan.head_branch],
+            name="git fetch",
+            timeout=600,
+        )
+        run(
+            ["git", "checkout", "-B", branch, f"origin/{branch}"],
+            name="git checkout",
+        )
+    else:
+        run(["git", "checkout", "-B", branch], name="git checkout")
+
     run(["git", "add", "-A"], name="git add")
-    run(["git", "commit", "-m", plan.pr_title], name="git commit", timeout=60)
+    # Identity is passed per-command (-c) rather than written to .git/config:
+    # the COI sandbox protects .git/config read-only, and a trusted host-side
+    # publisher must not depend on being able to rewrite it.
     run(
-        ["git", "push", "--force-with-lease", "-u", "origin", branch],
-        name="git push",
-        timeout=600,
+        [
+            "git",
+            "-c",
+            f"user.name={bot_name}",
+            "-c",
+            f"user.email={bot_email}",
+            "commit",
+            "-m",
+            plan.pr_title,
+        ],
+        name="git commit",
+        timeout=60,
+    )
+    origin = executor.run(
+        ["git", "remote", "get-url", "origin"], cwd=workspace, env=env, timeout=30
+    ).stdout.strip()
+    push_argv = [
+        "git",
+        "push",
+        "--force-with-lease",
+        _push_target(origin, plan.repo, env.get("GH_TOKEN", "")),
+        branch,
+    ]
+    if plan.update_existing_branch:
+        # Append to the PR branch: never force over human commits.
+        push_argv = ["git", "push", _push_target(origin, plan.repo, env.get("GH_TOKEN", "")), branch]
+    run(push_argv, name="git push", timeout=600)
+
+    pr_url = plan.pr_url or _create_pr(plan, branch, base, body, env, executor, workspace)
+    reply_url = None
+    if wants_reply:
+        reply_url = _comment_on_pr(plan, body, env, executor, workspace)
+    return PublishResult(
+        status="succeeded",
+        branch=branch,
+        pr_url=pr_url,
+        changed_files=files,
+        reply_url=reply_url,
     )
 
-    pr_url = _create_pr(plan, branch, base, body, env, executor, workspace)
-    return PublishResult(
-        status="succeeded", branch=branch, pr_url=pr_url, changed_files=files
-    )
+
+def _comment_on_pr(
+    plan: RunPlan,
+    body: str,
+    env: Mapping[str, str],
+    executor: Executor,
+    workspace: str,
+) -> Optional[str]:
+    """Post a comment on the PR conversation; returns its URL."""
+    number = plan.pr_number or plan.issue.pr_number
+    if not number:
+        return None
+    fd, path = tempfile.mkstemp(prefix="fleet-reply-", suffix=".md")
+    try:
+        with os.fdopen(fd, "w") as fh:
+            fh.write(body)
+        res = executor.run(
+            [
+                "gh",
+                "pr",
+                "comment",
+                str(number),
+                "--repo",
+                plan.repo,
+                "--body-file",
+                path,
+            ],
+            cwd=workspace,
+            env=env,
+            timeout=180,
+        )
+    finally:
+        try:
+            os.unlink(path)
+        except OSError:
+            pass
+    if res.exit_code != 0:
+        raise PublishError(
+            f"gh pr comment failed (exit {res.exit_code}): "
+            f"{res.stderr.strip() or res.stdout.strip()}"
+        )
+    return _first_url(res.stdout) or res.stdout.strip() or None
+
+
+def _push_target(origin: str, repo: str, token: str) -> str:
+    """Push URL for the trusted publisher.
+
+    Uses the scoped publish token over HTTPS so the clone's (read) credentials
+    in ``origin`` are never reused for a write. Falls back to ``origin`` for
+    non-HTTP remotes (e.g. local ``file://`` dev repos).
+    """
+    match = re.match(r"https?://(?:[^@/]+@)?([^/]+)/", origin or "")
+    if not match:
+        return origin or "origin"
+    host = match.group(1)
+    if token:
+        return f"https://x-access-token:{token}@{host}/{repo}.git"
+    return origin
 
 
 def _create_pr(

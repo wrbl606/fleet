@@ -29,13 +29,34 @@ def build_context(
     repo: str = "",
     platform: str = "linux",
     pr_title: str = "",
+    mode: str = "new_pr",
+    head_branch: str = "",
+    base_branch: str = "",
+    pr_number: Optional[int] = None,
+    pr_url: str = "",
 ) -> dict[str, Any]:
     """Build the canonical template context from a normalized issue."""
     return {
         "source": issue.source,
         "repo": repo,
         "platform": platform,
-        "pr": {"title": pr_title},
+        "mode": mode,
+        "pr": {
+            "title": pr_title,
+            "number": pr_number if pr_number is not None else (issue.pr_number or ""),
+            "url": pr_url,
+            "head_branch": head_branch or (issue.pr_head_branch or ""),
+            "base_branch": base_branch or (issue.pr_base_branch or ""),
+            "head_repo": issue.pr_head_repo or "",
+        },
+        "comment": {
+            "body": issue.comment_body or "",
+            "command": issue.command or "",
+            "author": issue.author or "",
+            "url": issue.comment_url or "",
+            "id": issue.comment_id if issue.comment_id is not None else "",
+            "association": issue.author_association or "",
+        },
         "issue": {
             "key": issue.key,
             "summary": issue.summary,

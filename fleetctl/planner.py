@@ -43,8 +43,22 @@ def build_plan(
         if registry.coi.untrusted_profile:
             manifest.coi.profile = registry.coi.untrusted_profile
 
+    mode = _resolve_mode(issue, manifest)
+    head_branch = issue.pr_head_branch if issue.is_pr_comment else None
+    base_branch = (
+        issue.pr_base_branch if issue.is_pr_comment else None
+    ) or resolution.base_branch
+    pr_url = _pr_url(issue, resolution.repo)
+
     context = build_context(
-        issue, repo=resolution.repo, platform=resolution.platform
+        issue,
+        repo=resolution.repo,
+        platform=resolution.platform,
+        mode=mode,
+        head_branch=head_branch or "",
+        base_branch=base_branch or "",
+        pr_number=issue.pr_number,
+        pr_url=pr_url or "",
     )
     pr_title = render(manifest.pr.title, context)
     context["pr"]["title"] = pr_title
@@ -65,7 +79,61 @@ def build_plan(
         coi_config=coi_config,
         coi_config_toml=dumps_toml(coi_config),
         repo=resolution.repo,
+        mode=mode,
+        head_branch=head_branch,
+        pr_number=issue.pr_number,
+        pr_url=pr_url,
+        comment_id=issue.comment_id,
     )
+
+
+def _resolve_mode(issue: Issue, manifest: FleetManifest) -> str:
+    if not issue.is_pr_comment:
+        return "new_pr"
+    # A repo cannot force a push it isn't allowed to make; forks are reply-only.
+    if not manifest.comment.enabled or issue.is_fork:
+        return "answer"
+    # Without the PR head ref (enrichment unavailable) we can only reply.
+    if not issue.pr_head_branch:
+        return "answer"
+    return {
+        "auto": "auto",
+        "code": "update_pr",
+        "answer": "answer",
+    }.get(manifest.comment.mode, "auto")
+
+
+def _pr_url(issue: Issue, repo: str) -> Optional[str]:
+    if not issue.is_pr_comment or not issue.pr_number:
+        return None
+    if issue.comment_url and "/pull/" in issue.comment_url:
+        return issue.comment_url.split("#", 1)[0]
+    return f"https://github.com/{repo}/pull/{issue.pr_number}"
+
+
+def render_comment_reply(plan: RunPlan, repo_dir: str, changed_files: list[str]) -> str:
+    """Human-facing PR reply: the agent's ``reply_file`` if present, else a summary."""
+    reply_file = plan.manifest.comment.reply_file
+    if reply_file:
+        path = Path(repo_dir) / ".fleet" / reply_file
+        if path.is_file():
+            text = path.read_text().strip()
+            if text:
+                return text + "\n"
+
+    lines = ["**fleet agent** processed this comment."]
+    if changed_files:
+        branch = plan.head_branch or plan.branch()
+        lines.append("")
+        lines.append(f"Pushed changes to `{branch}`:")
+        lines += [f"- `{f}`" for f in changed_files]
+    else:
+        lines.append("")
+        lines.append("No file changes were required.")
+    if plan.manifest.agent.tool:
+        lines.append("")
+        lines.append(f"_Agent: `{plan.manifest.agent.tool}`._")
+    return "\n".join(lines).strip() + "\n"
 
 
 def render_pr_body(plan: RunPlan, repo_dir: str, summary: str = "") -> str:

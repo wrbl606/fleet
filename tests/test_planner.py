@@ -63,6 +63,55 @@ class PlannerTest(unittest.TestCase):
         # acme/engine-api is trusted and the stub manifest pins no profile
         self.assertEqual(plan.manifest.coi.profile, "")
 
+    def _pr_issue(self, **over):
+        base = dict(
+            source="github",
+            key="o/r#14",
+            summary="change it",
+            kind="pr_comment",
+            repo_hint="o/r",
+            pr_number=14,
+            pr_head_branch="feature/x",
+            pr_base_branch="main",
+            comment_body="/agent change it",
+            command="change it",
+            comment_id=1,
+            comment_url="https://github.com/o/r/pull/14#issuecomment-1",
+        )
+        base.update(over)
+        return Issue(**base)
+
+    def test_pr_comment_auto_mode(self):
+        plan = build_plan(self._pr_issue(), self.reg, str(STUB))
+        self.assertEqual(plan.mode, "auto")
+        self.assertEqual(plan.head_branch, "feature/x")
+        self.assertEqual(plan.pr_number, 14)
+        self.assertEqual(plan.pr_url, "https://github.com/o/r/pull/14")
+        self.assertIn("change it", plan.prompt)
+
+    def test_pr_comment_fork_is_answer_only(self):
+        plan = build_plan(self._pr_issue(pr_head_repo="someone/r"), self.reg, str(STUB))
+        self.assertEqual(plan.mode, "answer")
+
+    def test_resolve_mode_from_manifest(self):
+        from fleetctl.models import FleetManifest
+        from fleetctl.planner import _resolve_mode
+
+        def manifest(**comment):
+            return FleetManifest.from_dict(
+                {
+                    "version": 1,
+                    "agent": {"tool": "claude", "inline": "x"},
+                    "comment": comment,
+                }
+            )
+
+        issue = self._pr_issue()
+        self.assertEqual(_resolve_mode(issue, manifest(mode="answer")), "answer")
+        self.assertEqual(_resolve_mode(issue, manifest(mode="code")), "update_pr")
+        self.assertEqual(_resolve_mode(issue, manifest(mode="auto")), "auto")
+        self.assertEqual(_resolve_mode(issue, manifest(enabled=False)), "answer")
+
 
 if __name__ == "__main__":
     unittest.main()

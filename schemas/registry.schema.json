@@ -73,7 +73,20 @@
             "additionalProperties": false,
             "properties": {
               "fallback_repo_from_issue": { "type": "boolean" },
-              "repo": { "type": "string", "pattern": "^[^/]+/[^/]+$" }
+              "repo": { "type": "string", "pattern": "^[^/]+/[^/]+$" },
+              "comment_prefix": { "type": "string", "minLength": 1 },
+              "comment_author_associations": {
+                "type": "array",
+                "items": { "type": "string" }
+              },
+              "comment_allow_users": {
+                "type": "array",
+                "items": { "type": "string" }
+              },
+              "comment_bot_logins": {
+                "type": "array",
+                "items": { "type": "string" }
+              }
             }
           }
         }

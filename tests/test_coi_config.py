@@ -50,6 +50,12 @@ class CoiConfigTest(unittest.TestCase):
         self.assertEqual(cfg["limits"]["memory"]["limit"], "4GiB")
         self.assertTrue(cfg["limits"]["runtime"]["auto_stop"])
 
+    def test_host_immutable_disabled_for_trusted_publisher(self):
+        # chattr +i on the host breaks the unprivileged publisher and workspace
+        # reuse; container-side read-only mounts still protect .git.
+        cfg = build_coi_config(self.manifest, self.reg, llm_env=None)
+        self.assertFalse(cfg["security"]["host_immutable"])
+
     def test_timeout_is_capped(self):
         m = FleetManifest.from_dict(
             {

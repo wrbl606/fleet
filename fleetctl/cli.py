@@ -26,6 +26,7 @@ from .coi_config import render_coi_toml, validate_coi_config, write_coi_config
 from .dispatcher import execute
 from .errors import FleetError, ValidationError
 from .exec_ import SubprocessExecutor
+from .github_api import enrich_issue_pr
 from .models import FleetManifest, Issue, RunPlan
 from .normalizers import get_normalizer
 from .notifier import notify_issue, post_run_finished  # noqa: F401
@@ -185,11 +186,28 @@ def cmd_validate(args: argparse.Namespace) -> int:
 
 def cmd_normalize(args: argparse.Namespace) -> int:
     payload = _read_json(args.payload_file)
-    normalizer = get_normalizer(args.source, trigger_label=args.trigger_label)
+    kwargs: dict[str, Any] = {}
+    if args.registry:
+        registry = _load_registry(args.registry)
+        kwargs = {
+            "comment_prefix": registry.github_comment_prefix,
+            "comment_author_associations": registry.github_comment_associations,
+            "comment_allow_users": registry.github_comment_allow_users,
+            "comment_bot_logins": registry.github_comment_bot_logins,
+        }
+    normalizer = get_normalizer(
+        args.source, trigger_label=args.trigger_label, **kwargs
+    )
     issue = normalizer.normalize(payload, event=args.event, headers=args.headers or {})
     if issue is None:
         _print_json({"actionable": False, "reason": "event filtered"}, args.out)
         return EXIT_OK
+    if args.source == "github" and issue.is_pr_comment and args.enrich:
+        # issue_comment carries no head/base refs; fetch them (best-effort).
+        try:
+            enrich_issue_pr(issue)
+        except ValidationError:
+            pass
     _print_json({"actionable": True, "issue": issue.to_dict()}, args.out)
     return EXIT_OK
 
@@ -207,12 +225,26 @@ def cmd_plan(args: argparse.Namespace) -> int:
     if args.issue_file:
         issue = _load_issue(args.issue_file)
     else:
-        normalizer = get_normalizer(args.source, trigger_label=args.trigger_label)
+        kwargs = {
+            "comment_prefix": registry.github_comment_prefix,
+            "comment_author_associations": registry.github_comment_associations,
+            "comment_allow_users": registry.github_comment_allow_users,
+            "comment_bot_logins": registry.github_comment_bot_logins,
+        }
+        normalizer = get_normalizer(
+            args.source, trigger_label=args.trigger_label, **kwargs
+        )
         payload = _read_json(args.payload_file)
         issue = normalizer.normalize(payload, event=args.event)
         if issue is None:
             _print_json({"actionable": False}, args.out)
             return EXIT_OK
+
+    if issue.is_pr_comment and not issue.pr_head_branch:
+        try:
+            enrich_issue_pr(issue)
+        except ValidationError:
+            pass
 
     plan = build_plan(issue, registry, args.repo_dir, llm_env=args.llm_env)
     if not args.skip_coi_validate:
@@ -323,10 +355,18 @@ def build_parser() -> argparse.ArgumentParser:
 
     p = sub.add_parser("normalize", help="payload -> canonical issue")
     p.add_argument("--source", required=True, choices=["jira", "linear", "github"])
+    p.add_argument("--registry", help="trusted registry (github comment policy)")
     p.add_argument("--payload-file", default="-")
     p.add_argument("--event")
     p.add_argument("--trigger-label", default="agent")
     p.add_argument("--headers", type=json.loads, default={})
+    p.add_argument(
+        "--no-enrich",
+        dest="enrich",
+        action="store_false",
+        help="skip GitHub PR metadata fetch for issue_comment",
+    )
+    p.set_defaults(enrich=True)
     p.add_argument("--out")
     p.set_defaults(func=cmd_normalize)
 

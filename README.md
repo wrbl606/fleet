@@ -31,6 +31,7 @@ Jira webhook ─▶ Jenkins (GWT) ─▶ normalize ▶ resolve ▶ clone ▶ pla
 | `registry.local.yaml` | Optional, **git-ignored** overlay for deployment-specific repos/projects; merged over `registry.yaml` by fleetctl |
 | `fleetctl` | Dispatcher core: normalize, resolve, plan, run the bounded loop, publish, notify |
 | Runner backends | `coi` (Linux sandbox) and `native` (macOS Seatbelt / Windows wrapper), fail-closed |
+| PR-comment trigger | A GitHub `/agent` comment updates the PR's branch and/or replies; policy in `registry.yaml` |
 | Admin panel | Phoenix LiveView run ledger, ingest API, manual trigger page, GitOps config PRs (`admin/`) |
 
 > **Why a Python core?** The plan describes a Groovy shared library. Here the
@@ -64,6 +65,8 @@ Jira webhook ─▶ Jenkins (GWT) ─▶ normalize ▶ resolve ▶ clone ▶ pla
   [`docs/p0-runbook.md`](./docs/p0-runbook.md)
 - **Admin panel:** Elixir/Erlang via [`mise`](https://mise.jdx.dev/) (pinned in
   `mise.toml`)
+- **Jenkins controller + build nodes:** exact tool and credential list in
+  [`docs/jenkins-node.md`](./docs/jenkins-node.md)
 
 ### Run the dispatcher locally
 
@@ -203,6 +206,8 @@ repos cannot widen network/resource policy. Full model:
 | [`docs/coi-images.md`](./docs/coi-images.md) | Custom COI images (e.g. the Flutter profile) |
 | [`docs/security.md`](./docs/security.md) | Trust boundaries, credentials, hardening |
 | [`docs/p0-runbook.md`](./docs/p0-runbook.md) | Install COI, run the P0 MVP |
+| [`docs/jenkins-node.md`](./docs/jenkins-node.md) | Jenkins controller + build-node requirements |
+| [`docs/plans/pr-comment-trigger.md`](./docs/plans/pr-comment-trigger.md) | GitHub `/agent` PR-comment trigger (plan + decisions) |
 | [`docs/bare-metal-hardening.md`](./docs/bare-metal-hardening.md) | macOS/Windows host hardening |
 | [`docs/scale-observability.md`](./docs/scale-observability.md) | Pools, autoscaling, audit shipping, metrics |
 | [`admin/README.md`](./admin/README.md) | Admin panel setup, API, schema |
