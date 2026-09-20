@@ -1,13 +1,46 @@
-# `.fleet` Remote Agent Runner
+# fleet — safe remote AI implementation
 
-Turns PM-tool webhooks (Jira today; Linear/GitHub stubbed) into autonomous
-coding-agent runs. Each task runs a chosen CLI agent (`claude`, `codex`,
-`opencode`, …) in an isolated environment, passes a per-repo verification gate,
-and is delivered as a GitHub PR for human review.
+fleet lets a team hand real engineering tasks to an AI coding agent **without
+trusting the agent**. A task is triggered from the tools the team already uses
+(Jira, or a GitHub `/agent` PR comment; Linear stubbed), the agent works inside
+a locked-down sandbox on your own hardware, and the change arrives as an
+ordinary pull request for human review. The agent never holds a GitHub token,
+never gets open network access, and cannot widen its own permissions.
 
-Isolation is **code-on-incus (COI)** on Linux and native execution on
-allowlisted macOS/Windows bare-metal nodes. Routing, allowlists and resource
-caps are central and trusted; per-repo behavior is declarative under `.fleet/`.
+The goal is not "fully autonomous coding" — it is **safe remote
+implementation**: delegate the typing while routing, credentials, blast radius,
+and merge authority stay under central, human-controlled policy.
+
+## What it defends against
+
+| Attack / risk | Mitigation |
+|---|---|
+| **Prompt injection** in an issue, PR comment, or repo file weaponizes the agent | The agent runs in a disposable sandbox with only the task repo mounted; the host and its tokens are out of reach, and every change is still a human-reviewed PR. |
+| **Malicious repo** exfiltrates secrets or reaches the network | Egress is an allowlist and COI domains/caps come from the trusted registry — not the repo. Untrusted repos get a hardened profile. |
+| **Repo widens its own sandbox** | A repo manifest may *request* policy but can never exceed the central `coi` caps or the domain allowlist; the gate fails closed. |
+| **Compromised agent** tries to push anywhere it likes | The agent gets **no** GitHub token. A separate trusted publisher stage uses a scoped token to commit/push only to the task branch. |
+| **Bare-metal escape** on macOS/Windows (no containers) | Native runs are fail-closed: OS sandbox (Seatbelt/PF, Windows wrapper) plus an explicit repo **and** node allowlist, or they do not run. |
+| **Forged or replayed webhooks** start unintended work | Webhooks are token-authenticated; PR-comment triggers are restricted by author association/allowlist and only update an existing PR branch. |
+| **Runaway or silent activity** | A bounded setup→agent→verify loop with timeouts and registry caps, every run recorded in the admin panel ledger/ingest log, and delivery only ever via PR. |
+
+## Built on established tooling
+
+fleet is deliberately **glue, not a new platform** — it composes tools you
+already run and can inspect:
+
+- **Jenkins** as the trusted control plane: webhook ingress (Generic Webhook
+  Trigger), node routing, and per-run credential binding.
+- **Incus** with **COI** (containers-on-incus) on Linux, and the native
+  **Seatbelt/PF** and **Windows** sandboxes for allowlisted bare-metal nodes.
+- **Git** and the **GitHub CLI (`gh`)** for checkout, scoped pushes and PRs.
+- **Existing headless CLI agents** (`claude`, `codex`, `opencode`, …), each
+  given only the LLM key it needs.
+- **Python** (stdlib-first) for the `fleetctl` core and **Phoenix LiveView** for
+  the admin panel.
+
+There is no bespoke container runtime, secret store, or agent protocol: routing
+is a versioned YAML registry, per-repo behavior is a declarative `.fleet/`
+contract, and the same `fleetctl` commands run on a laptop and in CI.
 
 Full design: [`fleet-agent-runner-plan.md`](./fleet-agent-runner-plan.md).
 Implements phases **P0–P6**.
@@ -32,7 +65,7 @@ Jira webhook ─▶ Jenkins (GWT) ─▶ normalize ▶ resolve ▶ clone ▶ pla
 | `fleetctl` | Dispatcher core: normalize, resolve, plan, run the bounded loop, publish, notify |
 | Runner backends | `coi` (Linux sandbox) and `native` (macOS Seatbelt / Windows wrapper), fail-closed |
 | PR-comment trigger | A GitHub `/agent` comment updates the PR's branch and/or replies; policy in `registry.yaml` |
-| Admin panel | Phoenix LiveView run ledger, ingest API, manual trigger page, GitOps config PRs (`admin/`) |
+| Admin panel | Phoenix LiveView run ledger, **ingest log**, ingest API, `/api/trigger`, GitOps config PRs (`admin/`) |
 
 > **Why a Python core?** The plan describes a Groovy shared library. Here the
 > pure logic lives in the dependency-light `fleetctl` CLI so it is unit-testable
@@ -67,6 +100,26 @@ Jira webhook ─▶ Jenkins (GWT) ─▶ normalize ▶ resolve ▶ clone ▶ pla
   `mise.toml`)
 - **Jenkins controller + build nodes:** exact tool and credential list in
   [`docs/jenkins-node.md`](./docs/jenkins-node.md)
+
+### Configure the registry
+
+Keep the tracked `registry.yaml` generic; write deployment-specific routing,
+allowlists and GitHub comment policy to the git-ignored `registry.local.yaml`
+overlay with the helper:
+
+```bash
+scripts/configure-registry.sh jira --project ENG --repo acme/engine --labels agent
+scripts/configure-registry.sh jira --project PLAT --repo acme/platform \
+    --component web=acme/web --platform linux
+scripts/configure-registry.sh trusted acme/engine
+scripts/configure-registry.sh github --comment-prefix /agent \
+    --author-associations OWNER,MEMBER,COLLABORATOR --allow-users ada
+scripts/configure-registry.sh show --effective     # merged view
+```
+
+It edits `registry.local.yaml` by default; pass `--file registry.yaml` to change
+the tracked file instead and `--dry-run` to preview. The same file path can be
+explicitly selected at run time with `FLEET_REGISTRY_LOCAL`.
 
 ### Run the dispatcher locally
 
@@ -105,6 +158,9 @@ Runtime env (see [`admin/README.md`](./admin/README.md)):
 `FLEET_INGEST_TOKEN`, `GITHUB_TOKEN`, `FLEET_WEBHOOK_URL` / `FLEET_WEBHOOK_TOKEN`
 (for the **Trigger** page), `FLEET_JENKINS_URL` (link to the Jenkins master),
 optional `FLEET_ADMIN_USER` / `FLEET_ADMIN_PASSWORD`.
+
+Pages: `/` run ledger, `/ingest` ingest log, `/trigger` manual trigger,
+`/gitops` config PRs.
 
 ### Jenkins (installed separately)
 
@@ -153,6 +209,31 @@ Install the plugins in `scripts/jenkins/plugins.txt`, then:
 
 Point the admin panel's Trigger page at the same invoke URL via
 `FLEET_WEBHOOK_URL` / `FLEET_WEBHOOK_TOKEN`.
+
+### Webhooks
+
+Everything enters through the Jenkins **Generic Webhook Trigger**, authenticated
+by the `fleet-webhook-token` shared secret in the query string.
+
+| Source | URL | Events |
+|---|---|---|
+| Jira | `POST {jenkins}/generic-webhook-trigger/invoke?token={fleet-webhook-token}&source=jira` | `jira:issue_created`, `jira:issue_updated` (a label change adding the trigger label) |
+| GitHub | `POST {jenkins}/generic-webhook-trigger/invoke?token={fleet-webhook-token}&source=github` (content type `application/json`) | `issues`, `issue_comment`, `pull_request_review_comment` — the event name comes from the `X-GitHub-Event` header |
+| Linear | `POST {jenkins}/generic-webhook-trigger/invoke?token={fleet-webhook-token}&source=linear` | `Issue` create/update |
+
+The panel also exposes its own endpoints (bearer `FLEET_INGEST_TOKEN`):
+
+- `POST /api/ingest` — run lifecycle + debug events: `run.started`,
+  `run.finished`, `audit.event`, `webhook.received`, `normalize.result`,
+  `resolve.result`.
+- `POST /api/trigger` — trigger a run through the panel (same path as the
+  Trigger page).
+
+**Ingest log.** Open `/ingest` in the panel to see every incoming webhook, the
+normalization outcome (`ok` / `filtered` / `error`), and the routing decision
+(`project → repo`, or the reason it did not resolve). It is the fastest way to
+debug why an event did not start a run. The dispatcher reports these events
+when the pipeline runs `fleetctl normalize`/`resolve` with `--ingest`.
 
 ## Upgrading host machines
 
@@ -301,6 +382,7 @@ repos cannot widen network/resource policy. Full model:
 | [`docs/security.md`](./docs/security.md) | Trust boundaries, credentials, hardening |
 | [`docs/p0-runbook.md`](./docs/p0-runbook.md) | Install COI, run the P0 MVP |
 | [`docs/jenkins-node.md`](./docs/jenkins-node.md) | Jenkins controller + build-node requirements |
+| [`docs/jenkins-interaction.md`](./docs/jenkins-interaction.md) | How Jenkins and the fleet project interact |
 | [`docs/plans/pr-comment-trigger.md`](./docs/plans/pr-comment-trigger.md) | GitHub `/agent` PR-comment trigger (plan + decisions) |
 | [`docs/bare-metal-hardening.md`](./docs/bare-metal-hardening.md) | macOS/Windows host hardening |
 | [`docs/scale-observability.md`](./docs/scale-observability.md) | Pools, autoscaling, audit shipping, metrics |
