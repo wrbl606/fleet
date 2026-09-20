@@ -46,6 +46,8 @@ export FLEET_CONFIG_GIT_REPO="$STATE_DIR/fleet-config-git"
 export FLEET_LOCAL_REPOS="$STATE_DIR/fleet-local-repos"
 export JENKINS_URL
 
+# NOTE: these are local placeholder credentials, not secrets — change them if
+# this Jenkins is reachable by anyone else. See docs/security.md.
 echo "[jenkins] ${JENKINS_URL}  (admin/admin)"
 
 if [ "${FLEET_DRY_RUN:-1}" = "0" ] && [ -n "${GH_PUBLISH_TOKEN:-}" ]; then

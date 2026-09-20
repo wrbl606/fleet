@@ -229,6 +229,14 @@ The panel also exposes its own endpoints (bearer `FLEET_INGEST_TOKEN`):
 - `POST /api/trigger` — trigger a run through the panel (same path as the
   Trigger page).
 
+> **Dev defaults — change them for any real deployment.** The bundled local
+> Jenkins and panel use the placeholder values `admin`/`admin`,
+> `local-webhook-token`, `local-dev-token`, and `local-read-token` /
+> `local-publish-token`. They are not secrets and are safe only on a
+> throwaway local host; replace them before the host is reachable by anyone
+> else. Full list and env vars:
+> [`docs/security.md`](./docs/security.md#local-development-defaults--change-before-any-real-deployment).
+
 **Ingest log.** Open `/ingest` in the panel to see every incoming webhook, the
 normalization outcome (`ok` / `filtered` / `error`), and the routing decision
 (`project → repo`, or the reason it did not resolve). It is the fastest way to

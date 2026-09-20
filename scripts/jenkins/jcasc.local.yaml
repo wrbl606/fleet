@@ -5,7 +5,9 @@
 # applied by scripts/jenkins/start.sh, which sets the ${...} environment
 # variables below.
 #
-# Local-only credentials (admin/admin, dummy git tokens) — never reuse.
+# Local-only credentials (admin/admin, dummy git tokens). These are insecure
+# placeholders, not secrets — replace them before any non-local/shared use.
+# See docs/security.md#local-development-defaults--change-before-any-real-deployment
 
 jenkins:
   systemMessage: "fLEET local dispatcher — Jenkins installed separately; see README"

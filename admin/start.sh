@@ -70,6 +70,8 @@ LINK_HOST="$(link_host)"
 [ -n "$LINK_HOST" ] || LINK_HOST="localhost"
 
 # Local dev defaults. `-` (not `:-`) so an explicitly empty value disables it.
+# These are placeholders, not secrets: set real values before exposing the panel.
+# See docs/security.md#local-development-defaults--change-before-any-real-deployment
 export FLEET_INGEST_TOKEN="${FLEET_INGEST_TOKEN-local-dev-token}"
 export FLEET_JENKINS_URL="${FLEET_JENKINS_URL-http://${LINK_HOST}:8080/}"
 

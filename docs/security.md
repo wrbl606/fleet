@@ -25,6 +25,26 @@
 Unknown sources/events are rejected by the normalizer; every normalized event
 must additionally resolve through `registry.yaml` or the run fails.
 
+## Local development defaults — change before any real deployment
+
+The bundled local Jenkins and admin panel ship **insecure, well-known defaults**
+so a fresh checkout runs with no setup. They are placeholders, not secrets, and
+**must be replaced before the host is reachable by anyone else** — a shared
+network, a remotely/web-exposed panel, CI, or production:
+
+| Default | Where | Replace with |
+|---|---|---|
+| `admin` / `admin` | local Jenkins login (`scripts/jenkins/jcasc.local.yaml`) | a strong password or SSO (edit the local JCasC, or use your own Jenkins) |
+| `local-webhook-token` | Generic Webhook Trigger + panel **Trigger** page | a random per-deployment webhook token |
+| `local-dev-token` | panel `/api/ingest` and `/api/trigger` bearer | a random `FLEET_INGEST_TOKEN` |
+| `local-read-token` / `local-publish-token` | local Jenkins GitHub credential stubs | real scoped GitHub tokens or an App installation token |
+
+Set the real values through the environment (`FLEET_INGEST_TOKEN`,
+`FLEET_WEBHOOK_TOKEN`, `FLEET_WEBHOOK_URL`, `FLEET_ADMIN_PASSWORD`,
+`GH_READ_TOKEN`, `GH_PUBLISH_TOKEN`, …) rather than editing tracked files, and
+keep the host's `secrets.env` (chmod 600) out of git. See the README upgrade
+runbook.
+
 ## Credentials
 
 - **LLM keys**: only the env *name* is in the repo (`[agent].llm_env`). Jenkins

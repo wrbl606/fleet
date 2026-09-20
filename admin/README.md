@@ -91,7 +91,15 @@ bash admin/start.sh                     # panel on :4000, Trigger page enabled
 It defaults `FLEET_WEBHOOK_URL` to
 `http://<this host>:8080/generic-webhook-trigger/invoke` and the token to
 `local-webhook-token` (override with `--webhook-url` / `--jenkins-url` or the
-env vars). `scripts/jenkins/start.sh` likewise defaults Jenkins' root URL to
+env vars).
+
+> **These local defaults (`local-webhook-token`, `local-dev-token`,
+> `admin`/`admin`) are placeholders, not secrets.** Set `FLEET_WEBHOOK_TOKEN`,
+> `FLEET_INGEST_TOKEN`, and `FLEET_ADMIN_PASSWORD` to real values before the
+> panel or Jenkins is reachable by anyone else. See
+> [`docs/security.md`](../docs/security.md#local-development-defaults--change-before-any-real-deployment).
+
+`scripts/jenkins/start.sh` likewise defaults Jenkins' root URL to
 this host's IP (`--jenkins-url` to change) — that value becomes the `BUILD_URL`
 the panel links to, so set it to an address clients can reach when the panel is
 accessed remotely. **The Generic Webhook Trigger is registered by the pipeline's
