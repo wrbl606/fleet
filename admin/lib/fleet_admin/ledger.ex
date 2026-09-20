@@ -10,10 +10,19 @@ defmodule FleetAdmin.Ledger do
   import Ecto.Query
 
   alias FleetAdmin.Repo
-  alias FleetAdmin.Ledger.{AuditEvent, Iteration, Pr, Run}
+
+  alias FleetAdmin.Ledger.{
+    AuditEvent,
+    IngestEvent,
+    Iteration,
+    Pr,
+    Run
+  }
+
   alias FleetAdmin.Urls
 
   @topic "runs"
+  @ingest_topic "ingest"
 
   # -- queries -------------------------------------------------------------
 
@@ -48,18 +57,110 @@ defmodule FleetAdmin.Ledger do
 
   def subscribe, do: Phoenix.PubSub.subscribe(FleetAdmin.PubSub, @topic)
 
+  def subscribe_ingest, do: Phoenix.PubSub.subscribe(FleetAdmin.PubSub, @ingest_topic)
+
   defp broadcast(run) do
     Phoenix.PubSub.broadcast(FleetAdmin.PubSub, @topic, {:run_ingested, run})
     run
   end
+
+  # -- ingest log ----------------------------------------------------------
+
+  def list_ingest_events(opts \\ []) do
+    limit = Keyword.get(opts, :limit, 200)
+
+    IngestEvent
+    |> maybe_filter(:source, opts[:source])
+    |> maybe_filter(:status, opts[:status])
+    |> order_by(desc: :inserted_at)
+    |> limit(^limit)
+    |> Repo.all()
+  end
+
+  def get_ingest_event!(id), do: Repo.get!(IngestEvent, id)
+
+  defp record_ingest(event, attrs) do
+    %IngestEvent{}
+    |> IngestEvent.changeset(Map.put(attrs, :event, event))
+    |> Repo.insert()
+    |> case do
+      {:ok, record} ->
+        Phoenix.PubSub.broadcast(
+          FleetAdmin.PubSub,
+          @ingest_topic,
+          {:ingest_recorded, record}
+        )
+
+        {:ok, record}
+
+      error ->
+        error
+    end
+  end
+
+  defp encode_detail(value, _error) when is_map(value) do
+    if map_size(value) == 0, do: nil, else: Jason.encode!(value, pretty: true)
+  end
+
+  defp encode_detail(value, _error) when is_binary(value), do: value
+  defp encode_detail(value, _error), do: inspect(value)
 
   # -- ingest --------------------------------------------------------------
 
   def ingest_event(%{"event" => "run.started"} = payload), do: ingest_started(payload)
   def ingest_event(%{"event" => "run.finished"} = payload), do: ingest_finished(payload)
   def ingest_event(%{"event" => "audit.event"} = payload), do: ingest_audit(payload)
+
+  def ingest_event(%{"event" => "webhook.received"} = p) do
+    record_ingest("webhook.received", %{
+      status: "received",
+      source: p["source"],
+      webhook_event: p["webhook_event"],
+      delivery: p["delivery"],
+      payload: p["payload"]
+    })
+  end
+
+  def ingest_event(%{"event" => "normalize.result"} = p) do
+    issue = p["issue"] || %{}
+
+    record_ingest("normalize.result", %{
+      status: normalize_status(p),
+      source: p["source"],
+      webhook_event: p["webhook_event"],
+      delivery: p["delivery"],
+      actionable: p["actionable"],
+      issue_key: issue["key"] || p["issue_key"],
+      project: issue["project"] || p["project"],
+      reason: p["reason"] || p["error"],
+      detail: encode_detail(issue, p["error"])
+    })
+  end
+
+  def ingest_event(%{"event" => "resolve.result"} = p) do
+    resolution = p["resolution"] || %{}
+
+    record_ingest("resolve.result", %{
+      status: p["status"] || if(p["error"], do: "error", else: "ok"),
+      source: p["source"],
+      issue_key: p["issue_key"],
+      project: p["project"],
+      repo: p["repo"] || resolution["repo"],
+      reason: p["reason"] || p["error"],
+      detail: encode_detail(resolution, p["error"])
+    })
+  end
+
   def ingest_event(%{"event" => other}), do: {:error, {:unknown_event, other}}
   def ingest_event(_payload), do: {:error, :missing_event}
+
+  defp normalize_status(p) do
+    cond do
+      p["error"] -> "error"
+      p["actionable"] -> "ok"
+      true -> "filtered"
+    end
+  end
 
   defp ingest_started(payload) do
     attrs = %{

@@ -33,6 +33,7 @@ from .notifier import notify_issue, post_run_finished  # noqa: F401
 from .planner import build_plan
 from .publisher import publish
 from .registry import Registry, discover_local_registry
+from .reporter import payload_text, post_event
 
 EXIT_OK = 0
 EXIT_ERROR = 1
@@ -186,6 +187,16 @@ def cmd_validate(args: argparse.Namespace) -> int:
 
 def cmd_normalize(args: argparse.Namespace) -> int:
     payload = _read_json(args.payload_file)
+    if args.ingest:
+        post_event(
+            {
+                "event": "webhook.received",
+                "source": args.source,
+                "webhook_event": args.event or "",
+                "delivery": args.delivery or "",
+                "payload": payload_text(payload),
+            }
+        )
     kwargs: dict[str, Any] = {}
     if args.registry:
         registry = _load_registry(args.registry)
@@ -198,8 +209,16 @@ def cmd_normalize(args: argparse.Namespace) -> int:
     normalizer = get_normalizer(
         args.source, trigger_label=args.trigger_label, **kwargs
     )
-    issue = normalizer.normalize(payload, event=args.event, headers=args.headers or {})
+    try:
+        issue = normalizer.normalize(payload, event=args.event, headers=args.headers or {})
+    except FleetError as exc:
+        _report_normalize(args, {"status": "error", "error": str(exc)})
+        raise
     if issue is None:
+        _report_normalize(
+            args,
+            {"actionable": False, "status": "filtered", "reason": "event filtered"},
+        )
         _print_json({"actionable": False, "reason": "event filtered"}, args.out)
         return EXIT_OK
     if args.source == "github" and issue.is_pr_comment and args.enrich:
@@ -208,14 +227,55 @@ def cmd_normalize(args: argparse.Namespace) -> int:
             enrich_issue_pr(issue)
         except ValidationError:
             pass
+    _report_normalize(
+        args, {"actionable": True, "status": "ok", "issue": issue.to_dict()}
+    )
     _print_json({"actionable": True, "issue": issue.to_dict()}, args.out)
     return EXIT_OK
+
+
+def _report_normalize(args: argparse.Namespace, extra: dict[str, Any]) -> None:
+    if not args.ingest:
+        return
+    post_event(
+        {
+            "event": "normalize.result",
+            "source": args.source,
+            "webhook_event": args.event or "",
+            "delivery": args.delivery or "",
+            **extra,
+        }
+    )
 
 
 def cmd_resolve(args: argparse.Namespace) -> int:
     issue = _load_issue(args.issue_file)
     registry = _load_registry(args.registry)
-    resolution = registry.resolve(issue)
+    try:
+        resolution = registry.resolve(issue)
+    except FleetError as exc:
+        if args.ingest:
+            post_event(
+                {
+                    "event": "resolve.result",
+                    "source": issue.source,
+                    "status": "error",
+                    "issue_key": issue.key,
+                    "project": issue.project,
+                    "error": str(exc),
+                }
+            )
+        raise
+    if args.ingest:
+        post_event(
+            {
+                "event": "resolve.result",
+                "source": issue.source,
+                "issue_key": issue.key,
+                "project": issue.project,
+                **resolution.to_dict(),
+            }
+        )
     _print_json(resolution.to_dict(), args.out)
     return EXIT_OK
 
@@ -361,6 +421,12 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--trigger-label", default="agent")
     p.add_argument("--headers", type=json.loads, default={})
     p.add_argument(
+        "--ingest",
+        action="store_true",
+        help="report webhook/normalize events to the admin ingest log",
+    )
+    p.add_argument("--delivery", help="webhook delivery id (e.g. X-GitHub-Delivery)")
+    p.add_argument(
         "--no-enrich",
         dest="enrich",
         action="store_false",
@@ -373,6 +439,11 @@ def build_parser() -> argparse.ArgumentParser:
     p = sub.add_parser("resolve", help="issue + registry -> resolution")
     p.add_argument("--registry", required=True)
     p.add_argument("--issue-file", required=True)
+    p.add_argument(
+        "--ingest",
+        action="store_true",
+        help="report the routing decision to the admin ingest log",
+    )
     p.add_argument("--out")
     p.set_defaults(func=cmd_resolve)
 

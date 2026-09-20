@@ -29,6 +29,7 @@ defmodule FleetAdminWeb.Router do
 
     live "/", RunLive.Index, :index
     live "/runs/:id", RunLive.Show, :show
+    live "/ingest", IngestLive.Index, :index
     live "/trigger", TriggerLive, :index
     live "/gitops", GitOpsLive, :index
   end

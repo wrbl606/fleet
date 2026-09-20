@@ -96,6 +96,71 @@ defmodule FleetAdmin.LedgerTest do
     assert run.external_id == "custom-1"
   end
 
+  test "records the ingest log for webhook, normalize and resolve" do
+    {:ok, webhook} =
+      Ledger.ingest_event(%{
+        "event" => "webhook.received",
+        "source" => "jira",
+        "webhook_event" => "jira:issue_created",
+        "delivery" => "d1",
+        "payload" => ~s({"issue":{"key":"ENG-1"}})
+      })
+
+    assert webhook.event == "webhook.received"
+    assert webhook.status == "received"
+
+    {:ok, normalized} =
+      Ledger.ingest_event(%{
+        "event" => "normalize.result",
+        "source" => "jira",
+        "webhook_event" => "jira:issue_created",
+        "actionable" => true,
+        "issue" => %{"key" => "ENG-1", "project" => "ENG"}
+      })
+
+    assert normalized.status == "ok"
+    assert normalized.issue_key == "ENG-1"
+    assert normalized.actionable
+    assert normalized.detail =~ "ENG-1"
+
+    {:ok, filtered} =
+      Ledger.ingest_event(%{
+        "event" => "normalize.result",
+        "source" => "github",
+        "actionable" => false,
+        "reason" => "event filtered"
+      })
+
+    assert filtered.status == "filtered"
+
+    {:ok, resolved} =
+      Ledger.ingest_event(%{
+        "event" => "resolve.result",
+        "source" => "jira",
+        "issue_key" => "ENG-1",
+        "project" => "ENG",
+        "resolution" => %{"repo" => "acme/engine", "platform" => "linux"}
+      })
+
+    assert resolved.status == "ok"
+    assert resolved.repo == "acme/engine"
+
+    {:ok, failed} =
+      Ledger.ingest_event(%{
+        "event" => "resolve.result",
+        "source" => "jira",
+        "issue_key" => "ENG-9",
+        "project" => "NOPE",
+        "error" => "no registry source matches"
+      })
+
+    assert failed.status == "error"
+    assert failed.reason =~ "no registry"
+
+    assert length(Ledger.list_ingest_events()) == 5
+    assert [%{status: "error"}] = Ledger.list_ingest_events(status: "error")
+  end
+
   test "ingests run.started" do
     assert {:ok, run} =
              Ledger.ingest_event(%{

@@ -41,6 +41,20 @@ defmodule FleetAdminWeb.IngestControllerTest do
     assert run.reply_url =~ "issuecomment-2"
   end
 
+  test "ingests a webhook.received debug event", %{conn: conn} do
+    payload = %{
+      "event" => "webhook.received",
+      "source" => "github",
+      "webhook_event" => "issue_comment",
+      "delivery" => "d-1",
+      "payload" => ~s({"action":"created"})
+    }
+
+    conn = conn |> authed() |> post(~p"/api/ingest", payload)
+    assert %{"ok" => true, "id" => id} = json_response(conn, 201)
+    assert FleetAdmin.Ledger.get_ingest_event!(id).event == "webhook.received"
+  end
+
   test "rejects unknown events", %{conn: conn} do
     conn = conn |> authed() |> post(~p"/api/ingest", %{"event" => "nope"})
     assert %{"ok" => false} = json_response(conn, 422)

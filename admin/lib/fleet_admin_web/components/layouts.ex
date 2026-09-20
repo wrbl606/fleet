@@ -47,6 +47,9 @@ defmodule FleetAdminWeb.Layouts do
             <.link navigate={~p"/"} class="btn btn-ghost btn-sm">Runs</.link>
           </li>
           <li>
+            <.link navigate={~p"/ingest"} class="btn btn-ghost btn-sm">Ingest</.link>
+          </li>
+          <li>
             <.link navigate={~p"/trigger"} class="btn btn-ghost btn-sm">Trigger</.link>
           </li>
           <li>

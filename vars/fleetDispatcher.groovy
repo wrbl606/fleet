@@ -51,7 +51,8 @@ def call(Map cfg = [:]) {
         bootstrapPython()
         writeFile file: 'payload.json', text: payload
         def cmd = "python3 -m fleetctl normalize --source ${source} " +
-          "--payload-file payload.json --event '${event}' --registry ${registryPath}"
+          "--payload-file payload.json --event '${event}' --registry ${registryPath} " +
+          "--ingest --delivery '${env.x_github_delivery ?: ''}'"
         def raw
         if (source == 'github') {
           // Bind the read token so issue_comment PR metadata can be fetched.
@@ -89,7 +90,7 @@ def call(Map cfg = [:]) {
           writeJSON file: 'issue.json', json: issue
         }
         def raw = sh(
-          script: "python3 -m fleetctl resolve --registry ${registryPath} --issue-file issue.json",
+          script: "python3 -m fleetctl resolve --registry ${registryPath} --issue-file issue.json --ingest",
           returnStdout: true
         ).trim()
         plan = parseJson(raw)
