@@ -95,6 +95,8 @@ class GithubNormalizer(Normalizer):
             raise _bad("issue")
         repo = _need(payload, "repository.full_name")
         number = _need(issue, "number")
+        repository = payload.get("repository") or {}
+        default_branch = repository.get("default_branch")
         return Issue(
             source=self.source,
             key=f"{repo}#{number}",
@@ -105,6 +107,7 @@ class GithubNormalizer(Normalizer):
             reporter=self._login(issue.get("user")),
             url=str(issue.get("html_url", "")),
             repo_hint=str(repo),
+            default_branch=str(default_branch) if default_branch else None,
             event=ISSUES,
         )
 

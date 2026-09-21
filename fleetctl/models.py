@@ -56,6 +56,9 @@ class Issue:
     reporter: Optional[str] = None
     url: str = ""
     repo_hint: Optional[str] = None
+    #: Default branch of the repo as reported by the source (GitHub webhook
+    #: ``repository.default_branch``); used as the clone/PR-base fallback.
+    default_branch: Optional[str] = None
     event: str = ""
 
     #: "issue" for a PM task, "pr_comment" for a PR-comment trigger.
@@ -98,6 +101,7 @@ class Issue:
             "reporter": self.reporter,
             "url": self.url,
             "repo_hint": self.repo_hint,
+            "default_branch": self.default_branch,
             "event": self.event,
             "kind": self.kind,
             "pr_number": self.pr_number,
@@ -128,6 +132,7 @@ class Issue:
             reporter=data.get("reporter"),
             url=data.get("url", ""),
             repo_hint=data.get("repo_hint"),
+            default_branch=data.get("default_branch"),
             event=data.get("event", ""),
             kind=data.get("kind", "issue"),
             pr_number=data.get("pr_number"),

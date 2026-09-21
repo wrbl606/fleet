@@ -120,6 +120,32 @@ class RegistryTest(unittest.TestCase):
         r = reg.resolve(mk_issue(project="WIN"))
         self.assertTrue(r.native)
 
+    def test_github_issue_uses_webhook_default_branch(self):
+        issue = mk_issue(
+            source="github",
+            key="o/r#4",
+            project="",
+            repo_hint="o/r",
+            default_branch="development",
+        )
+        r = self.reg.resolve(issue)
+        self.assertEqual(r.repo, "o/r")
+        self.assertEqual(r.base_branch, "development")
+
+    def test_github_issue_falls_back_to_registry_default_branch(self):
+        issue = mk_issue(source="github", key="o/r#4", project="", repo_hint="o/r")
+        r = self.reg.resolve(issue)
+        self.assertEqual(r.base_branch, "main")
+
+    def test_source_base_branch_overrides_webhook_default(self):
+        data = self.reg.raw
+        data["sources"]["jira"].append(
+            {"project": "REL", "repo": "acme/engine", "base_branch": "release"}
+        )
+        reg = Registry.from_dict(data)
+        r = reg.resolve(mk_issue(project="REL", default_branch="development"))
+        self.assertEqual(r.base_branch, "release")
+
     def test_missing_github_org_rejected(self):
         from fleetctl.errors import ValidationError
 

@@ -246,7 +246,9 @@ class Registry:
         platform = entry.get("platform", self.platform)
         requires = list(entry.get("requires", []))
         labels = list(dict.fromkeys([*self.labels, *entry.get("labels", [])]))
-        base_branch = entry.get("base_branch", self.default_branch)
+        base_branch = (
+            entry.get("base_branch") or issue.default_branch or self.default_branch
+        )
         native = platform != "linux"
 
         native_options: dict[str, Any] = {}

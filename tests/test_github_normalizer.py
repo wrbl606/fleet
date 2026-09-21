@@ -28,6 +28,23 @@ def issue_comment(body="/agent add tests", **over):
     return payload
 
 
+def issue_event(**over):
+    payload = {
+        "action": "opened",
+        "issue": {
+            "number": 4,
+            "title": "chore: use mise",
+            "body": "Create mise.toml",
+            "labels": [],
+            "user": {"login": "bob"},
+            "html_url": "https://github.com/o/r/issues/4",
+        },
+        "repository": {"full_name": "o/r", "default_branch": "development"},
+    }
+    payload.update(over)
+    return payload
+
+
 def review_comment(body="/agent explain this"):
     return {
         "action": "created",
@@ -119,6 +136,20 @@ class GithubNormalizerTest(unittest.TestCase):
         self.assertEqual(issue.pr_base_branch, "main")
         self.assertEqual(issue.pr_head_repo, "o/r")
         self.assertEqual(issue.pr_state, "open")
+
+    def test_issue_carries_repo_default_branch(self):
+        issue = self.n.normalize(issue_event(), event="issues")
+        self.assertIsNotNone(issue)
+        self.assertEqual(issue.kind, "issue")
+        self.assertEqual(issue.repo_hint, "o/r")
+        self.assertEqual(issue.default_branch, "development")
+
+    def test_issue_without_default_branch_is_none(self):
+        p = issue_event()
+        p["repository"].pop("default_branch")
+        issue = self.n.normalize(p, event="issues")
+        self.assertIsNotNone(issue)
+        self.assertIsNone(issue.default_branch)
 
     def test_event_inferred_from_headers(self):
         issue = self.n.normalize(
