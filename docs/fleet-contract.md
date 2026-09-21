@@ -94,7 +94,9 @@ instruction. `{{issue.labels}}` renders as a comma-joined list.
 
 A GitHub `issue_comment` (or `pull_request_review_comment`) whose body starts
 with the trusted prefix (`/agent` by default) starts a run against the PR's
-existing branch. `[comment].mode` selects the behavior:
+existing branch. On a **plain issue** (no pull request), an `/agent` comment
+instead starts the normal new-PR issue flow for that issue. `[comment].mode`
+selects the behavior:
 
 - `auto` (default) — reply always; push a commit to the PR branch only if the
   agent changed files.

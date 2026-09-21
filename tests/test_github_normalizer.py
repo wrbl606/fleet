@@ -112,9 +112,26 @@ class GithubNormalizerTest(unittest.TestCase):
         p["comment"]["author_association"] = "NONE"
         self.assertIsNotNone(n.normalize(p, event="issue_comment"))
 
-    def test_comment_on_plain_issue_ignored(self):
-        p = issue_comment()
+    def test_comment_on_plain_issue_starts_issue_flow(self):
+        p = issue_comment(body="/agent please add a dark mode toggle")
         p["issue"].pop("pull_request")
+        p["repository"]["default_branch"] = "main"
+        issue = self.n.normalize(p, event="issue_comment")
+        self.assertIsNotNone(issue)
+        self.assertEqual(issue.kind, "issue")
+        self.assertFalse(issue.is_pr_comment)
+        self.assertEqual(issue.summary, "Add widget")
+        self.assertEqual(issue.description, "pr body")
+        self.assertEqual(issue.repo_hint, "o/r")
+        self.assertEqual(issue.default_branch, "main")
+        self.assertEqual(issue.command, "please add a dark mode toggle")
+        self.assertEqual(issue.comment_id, 555)
+        self.assertEqual(issue.author, "alice")
+
+    def test_plain_issue_comment_still_needs_authorization(self):
+        p = issue_comment(body="/agent do it")
+        p["issue"].pop("pull_request")
+        p["comment"]["author_association"] = "NONE"
         self.assertIsNone(self.n.normalize(p, event="issue_comment"))
 
     def test_edited_action_ignored(self):

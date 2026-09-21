@@ -40,7 +40,7 @@ Unlike the issue flow, this does **not** open a new PR.
 
 | # | Decision |
 |---|---|
-| 1 | Replies go to the **PR conversation only**. |
+| 1 | Replies go to the **PR conversation only**. A comment on a **plain issue** is not a reply: it starts the normal `new_pr` issue flow. |
 | 2 | Default mode is **auto**: always reply; commit/push only if the agent changed files. |
 | 3 | Trigger allowed for `author_association ∈ {OWNER, MEMBER, COLLABORATOR}` **plus** an explicit user allowlist; prefix policy lives in the trusted registry. |
 | 4 | **Any non-base branch** may be updated (no `fleet/*`-only restriction); never the base branch. |

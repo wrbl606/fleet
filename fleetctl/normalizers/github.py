@@ -3,9 +3,10 @@
 Actionable events:
 
 * ``issues`` — issue ``opened`` (existing new-PR flow).
-* ``issue_comment`` — ``created`` comment on a **pull request** whose body
-  starts with the trusted ``/agent`` prefix; the comment becomes the task
-  ("action" mode) and/or a question ("answer" mode).
+* ``issue_comment`` — ``created`` comment whose body starts with the trusted
+  ``/agent`` prefix. On a **pull request** it updates that PR ("action" mode)
+  and/or answers ("answer" mode); on a **plain issue** it starts the normal
+  new-PR issue flow for that issue.
 * ``pull_request_review_comment`` — inline review comment, same prefix rules.
 
 The prefix and who-may-trigger policy are **trusted** (registry
@@ -144,10 +145,14 @@ class GithubNormalizer(Normalizer):
             issue = payload.get("issue")
             if not isinstance(issue, dict):
                 raise _bad("issue")
-            if not issue.get("pull_request"):
-                # PR conversation only (decision #1).
-                return None
             number = int(_need(issue, "number"))
+            if not issue.get("pull_request"):
+                # Plain issue: the comment kicks off the normal new-PR flow, so
+                # an operator can start work with `/agent` on the issue itself
+                # instead of needing a PR to exist first.
+                return self._issue_from_comment(
+                    payload, issue, repo, number, body, command, login, association
+                )
             head_repo = head_branch = base_branch = state = None
 
         summary = command.splitlines()[0].strip() if command.strip() else f"PR #{number} comment"
@@ -177,6 +182,42 @@ class GithubNormalizer(Normalizer):
         )
 
     # -- helpers ------------------------------------------------------------
+
+    def _issue_from_comment(
+        self,
+        payload: dict[str, Any],
+        issue: dict[str, Any],
+        repo: str,
+        number: int,
+        body: str,
+        command: str,
+        login: str,
+        association: str,
+    ) -> Issue:
+        """A plain-issue comment trigger: run the issue's new-PR flow."""
+        comment = payload.get("comment") or {}
+        repository = payload.get("repository") or {}
+        default_branch = repository.get("default_branch")
+        return Issue(
+            source=self.source,
+            key=f"{repo}#{number}",
+            summary=str(issue.get("title", "")),
+            description=str(issue.get("body") or ""),
+            labels=self._labels(issue),
+            project=repo,
+            reporter=self._login(issue.get("user")),
+            url=str(issue.get("html_url", "")),
+            repo_hint=repo,
+            default_branch=str(default_branch) if default_branch else None,
+            event=ISSUE_COMMENT,
+            kind="issue",
+            comment_id=int(comment["id"]) if comment.get("id") is not None else None,
+            comment_url=str(comment.get("html_url") or ""),
+            comment_body=body,
+            command=command.strip(),
+            author=login or None,
+            author_association=association or None,
+        )
 
     def _match_command(self, body: str) -> Optional[str]:
         text = (body or "").strip()
