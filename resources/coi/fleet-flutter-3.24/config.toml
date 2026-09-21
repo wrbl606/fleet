@@ -1,0 +1,17 @@
+# COI profile: Flutter 3.24 image for older repos that still rely on the
+# synthetic `package:flutter_gen` l10n package (removed in newer Flutter).
+#
+# Install + build on a runner host:
+#   mkdir -p ~/.coi/profiles && cp -r resources/coi/fleet-flutter-3.24 ~/.coi/profiles/
+#   coi build --profile fleet-flutter-3.24
+#
+# Why an image (not setup.sh): the dispatcher runs setup/agent/verify as
+# separate ephemeral containers and only the workspace persists, so toolchains
+# like Flutter must be baked into the image.
+
+[container]
+image = "coi-fleet-flutter-3.24"
+
+[container.build]
+base = "coi-default"
+script = "build.sh"
