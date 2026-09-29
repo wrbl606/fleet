@@ -1,0 +1,57 @@
+---
+import Layout from "./Layout.astro";
+import Nav from "../components/Nav.astro";
+import Footer from "../components/Footer.astro";
+import Icon from "../components/Icon.astro";
+
+interface Props {
+  title: string;
+  description?: string;
+}
+
+const { title, description } = Astro.props;
+const current = Astro.url.pathname;
+
+const pages = [
+  { href: "/docs", label: "Overview", icon: "book-open" },
+  { href: "/docs/installation", label: "Installation", icon: "wrench-screwdriver" },
+  { href: "/docs/triggers", label: "Triggers & ingest", icon: "bolt" },
+];
+---
+
+<Layout title={`${title} — fleet docs`} description={description}>
+  <Nav />
+  <div class="mx-auto max-w-7xl px-6 py-16 lg:px-8 lg:py-20">
+    <div class="grid gap-10 lg:grid-cols-[220px_minmax(0,1fr)]">
+      <aside class="lg:sticky lg:top-28 lg:self-start">
+        <p class="mb-4 font-mono text-xs uppercase tracking-[0.3em] text-base-content/40">
+          Documentation
+        </p>
+        <nav class="flex flex-col gap-1">
+          {
+            pages.map((page) => (
+              <a
+                href={page.href}
+                data-astro-prefetch
+                class:list={[
+                  "flex items-center gap-2 rounded-lg px-3 py-2 text-sm transition",
+                  current === page.href
+                    ? "bg-base-content/5 font-medium text-base-content"
+                    : "text-base-content/60 hover:bg-base-content/5 hover:text-base-content",
+                ]}
+              >
+                <Icon name={page.icon} class="size-4" />
+                {page.label}
+              </a>
+            ))
+          }
+        </nav>
+      </aside>
+
+      <article class="min-w-0 max-w-3xl">
+        <slot />
+      </article>
+    </div>
+  </div>
+  <Footer />
+</Layout>

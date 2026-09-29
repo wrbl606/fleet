@@ -8,10 +8,15 @@ CI behaviour is not special-cased.
 ## Direction of interaction
 
 ```
-webhook ─▶ Jenkins (GWT) ─▶ fleetDispatcher.groovy ─▶ fleetctl CLI ─▶ GitHub / COI / panel
-                                   ▲                        │
-                                   └──── result.json ◀──────┘
+webhook ─▶ panel /api/ingest ─▶ Jenkins (GWT) ─▶ fleetDispatcher.groovy ─▶ fleetctl CLI ─▶ GitHub / COI / panel
+   │              (record + forward)                  ▲                        │
+   └────────────── direct to Jenkins ────────────────┘        result.json ◀───┘
 ```
+
+Senders normally POST to the panel's ingest endpoint
+(`POST /api/ingest?source=<source>`), which records `webhook.received` and
+forwards the raw body to Jenkins; they can also hit the Generic Webhook Trigger
+directly (see [`triggers.md`](./triggers.md)).
 
 - **Jenkins → fleet**: starts `fleetctl` stages, binds credentials, routes the
   run to a node, provides the workspace, and reports the final build result.
@@ -21,10 +26,15 @@ webhook ─▶ Jenkins (GWT) ─▶ fleetDispatcher.groovy ─▶ fleetctl CLI �
 
 ## The flow, step by step
 
-1. A Jira/GitHub/Linear webhook hits the **Generic Webhook Trigger**:
+1. A Jira/GitHub/Linear webhook reaches the **Generic Webhook Trigger**:
    `POST {jenkins}/generic-webhook-trigger/invoke?token={fleet-webhook-token}&source={jira|github|linear}`.
+   Usually the **panel** is in front of it: the sender posts to
+   `POST {panel}/api/ingest?source=...`, the panel records `webhook.received` and
+   forwards the raw body to the same invoke URL (`FLEET_WEBHOOK_URL`), passing
+   through `X-GitHub-Event` / `X-GitHub-Delivery` and adding `x-fleet-event`.
    GWT exposes the raw body as `payload`; GitHub's event name arrives in the
-   `X-GitHub-Event` header (`x_github_event`).
+   `X-GitHub-Event` header (`x_github_event`). See
+   [`triggers.md`](./triggers.md) for the endpoint contract.
 2. The job's `Jenkinsfile` loads the GitOps config repo as a shared library and
    calls `fleetDispatcher()`:
    ```groovy
@@ -70,13 +80,17 @@ logic.
 
 ## Feedback to the panel
 
-Two independent paths:
+Three independent paths, all landing on `POST /api/ingest`:
 
+- **Inbound webhooks** — `POST /api/ingest?source=<source>` records
+  `webhook.received` and forwards to Jenkins (the panel is the entry point; see
+  [`triggers.md`](./triggers.md)).
 - `fleetctl notify` → `POST /api/ingest` with `run.started` / `run.finished`
-  (ledger rows used by the runs UI).
-- `fleetctl normalize` / `resolve` with `--ingest` → `webhook.received`,
-  `normalize.result`, `resolve.result`, shown on the panel `/ingest` page for
-  debugging normalization and routing.
+  (ledger rows used by the runs UI). No `source`, so these are recorded and
+  never forwarded.
+- `fleetctl normalize` / `resolve` with `--ingest` → `normalize.result`,
+  `resolve.result`, shown on the panel `/ingest` page for debugging
+  normalization and routing.
 
 ## Where to look
 

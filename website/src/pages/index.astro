@@ -1,0 +1,244 @@
+---
+import Layout from "../layouts/Layout.astro";
+import Nav from "../components/Nav.astro";
+import Hero from "../components/Hero.astro";
+import Footer from "../components/Footer.astro";
+import SectionHeading from "../components/SectionHeading.astro";
+import CodeCard from "../components/CodeCard.astro";
+import Icon from "../components/Icon.astro";
+import TrustGraph from "../components/TrustGraph.astro";
+import {
+  risks,
+  stack,
+  concepts,
+  docs,
+  pipeline,
+  setupCode,
+  coreCode,
+  panelCode,
+} from "../data";
+---
+
+<Layout>
+  <Nav />
+
+  <main>
+    <Hero />
+
+    <!-- Flow -->
+    <section class="mx-auto max-w-7xl px-6 py-16 lg:px-8">
+      <div class="rounded-3xl border border-base-content/10 bg-base-content/[0.02] p-8 lg:p-12">
+        <p
+          class="mb-8 text-center font-mono text-xs uppercase tracking-[0.3em] text-base-content/40"
+        >
+          the path of every task
+        </p>
+        <div class="flex flex-wrap items-center justify-center gap-x-2 gap-y-3">
+          {
+            pipeline.map((step, i) => (
+              <span class="flex items-center gap-2">
+                <span
+                  class:list={[
+                    "rounded-lg border px-3 py-1.5 font-mono text-xs transition",
+                    ["agent", "publish"].includes(step)
+                      ? "border-primary/40 bg-primary/10 text-primary-content"
+                      : "border-base-content/10 bg-base-content/[0.03] text-base-content/70",
+                  ]}
+                >
+                  {step.replace(":", " ")}
+                </span>
+                {i < pipeline.length - 1 && (
+                  <Icon name="chevron-right" class="size-3 text-base-content/25" />
+                )}
+              </span>
+            ))
+          }
+        </div>
+        <p class="mt-8 text-center text-sm text-base-content/50">
+          A fail in <span class="text-base-content/80">verify</span> triggers a bounded retry;
+          delivery only ever happens through a pull request.
+        </p>
+      </div>
+    </section>
+
+    <!-- Risks -->
+    <section id="security" class="mx-auto max-w-7xl px-6 py-20 lg:px-8">
+      <SectionHeading
+        eyebrow="threat model"
+        title="What it defends against"
+        subtitle="Every risk maps to a concrete, centrally-controlled mitigation — no trust required in the agent or the repo."
+      />
+      <div class="mt-14 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+        {
+          risks.map((risk) => (
+            <div class="group relative overflow-hidden rounded-2xl border border-base-content/10 bg-base-content/[0.02] p-6 transition hover:-translate-y-1 hover:border-primary/30 hover:bg-base-content/[0.04]">
+              <div class="absolute -right-8 -top-8 size-24 rounded-full bg-primary/10 opacity-0 blur-2xl transition group-hover:opacity-100" />
+              <div class="mb-4 inline-grid size-11 place-items-center rounded-xl border border-base-content/10 bg-base-content/5 text-primary">
+                <Icon name={risk.icon} class="size-5" />
+              </div>
+              <h3 class="mb-2 text-lg font-semibold tracking-tight">{risk.title}</h3>
+              <p class="text-sm leading-relaxed text-base-content/60">{risk.detail}</p>
+            </div>
+          ))
+        }
+      </div>
+    </section>
+
+    <!-- Stack -->
+    <section id="stack" class="mx-auto max-w-7xl px-6 py-20 lg:px-8">
+      <div class="grid gap-14 lg:grid-cols-[0.9fr_1.1fr]">
+        <div class="lg:sticky lg:top-28 lg:self-start">
+          <SectionHeading
+            align="left"
+            eyebrow="built on established tooling"
+            title="Standing on the shoulders of giants"
+            subtitle="fleet is deliberately glue, not a new platform. It composes tools you already run and can inspect."
+          />
+          <div class="mt-8 rounded-2xl border border-base-content/10 bg-base-content/[0.02] p-6">
+            <p class="text-sm leading-relaxed text-base-content/60">
+              There is no bespoke container runtime, secret store, or agent protocol. Routing is a
+              versioned YAML registry, per-repo behavior is a declarative{" "}
+              <code class="rounded bg-base-content/5 px-1.5 py-0.5 font-mono text-xs">.fleet/</code>{" "}
+              contract, and the same{" "}
+              <code class="rounded bg-base-content/5 px-1.5 py-0.5 font-mono text-xs">fleetctl</code>{" "}
+              commands run on a laptop and in CI.
+            </p>
+          </div>
+        </div>
+
+        <div class="grid gap-4 sm:grid-cols-2">
+          {
+            stack.map((item) => (
+              <div class="group rounded-2xl border border-base-content/10 bg-base-content/[0.02] p-6 transition hover:border-base-content/20 hover:bg-base-content/[0.04]">
+                <div class="flex items-center justify-between">
+                  <span class="font-mono text-[10px] uppercase tracking-[0.2em] text-primary/80">
+                    {item.tag}
+                  </span>
+                  <Icon
+                    name="arrow-up-right"
+                    class="size-4 text-base-content/25 transition group-hover:text-base-content/60"
+                  />
+                </div>
+                <h3 class="mt-4 text-lg font-semibold tracking-tight">{item.name}</h3>
+                <p class="mt-2 text-sm leading-relaxed text-base-content/60">{item.detail}</p>
+              </div>
+            ))
+          }
+        </div>
+      </div>
+    </section>
+
+    <!-- Architecture -->
+    <section id="architecture" class="mx-auto max-w-7xl px-6 py-20 lg:px-8">
+      <SectionHeading
+        eyebrow="architecture"
+        title="Dependencies and trust boundaries"
+        subtitle="How the pieces depend on each other, and where credentials cross — or never cross."
+      />
+      <div class="mt-14 rounded-3xl border border-base-content/10 bg-base-content/[0.02] p-4 sm:p-8">
+        <TrustGraph />
+      </div>
+    </section>
+
+    <!-- Concepts -->
+    <section id="concepts" class="mx-auto max-w-7xl px-6 py-20 lg:px-8">
+      <SectionHeading
+        eyebrow="concepts"
+        title="Small surface, sharp edges"
+        subtitle="A handful of names cover the whole system — routing, contract, dispatcher, backends, and the panel."
+      />
+      <div class="mt-14 overflow-x-auto rounded-2xl border border-base-content/10">
+        <table class="w-full border-collapse text-left text-sm">
+          <thead>
+            <tr
+              class="bg-base-content/[0.03] text-xs uppercase tracking-[0.15em] text-base-content/40"
+            >
+              <th class="px-6 py-4 font-medium">Concept</th>
+              <th class="px-6 py-4 font-medium">What it is</th>
+            </tr>
+          </thead>
+          <tbody>
+            {
+              concepts.map((concept) => (
+                <tr class="border-t border-base-content/5 transition hover:bg-base-content/[0.02]">
+                  <td class="whitespace-nowrap px-6 py-4 align-top font-mono text-[13px] text-primary">
+                    {concept.name}
+                  </td>
+                  <td class="px-6 py-4 leading-relaxed text-base-content/60">{concept.detail}</td>
+                </tr>
+              ))
+            }
+          </tbody>
+        </table>
+      </div>
+      <p class="mt-6 text-sm text-base-content/40">
+        <span class="font-mono text-base-content/60">Why a Python core?</span>
+        The logic lives in the dependency-light <span class="font-mono">fleetctl</span>
+        CLI, so it is unit-testable and runs the same on a laptop and in CI. Jenkins stays a thin
+        trigger.
+      </p>
+    </section>
+
+    <!-- Quickstart -->
+    <section id="start" class="mx-auto max-w-7xl px-6 py-20 lg:px-8">
+      <SectionHeading
+        eyebrow="basic setup"
+        title="Clone, install, run"
+        subtitle="The dispatcher core and the panel run without Jenkins. The webhook → pipeline → PR flow needs a Jenkins you operate yourself."
+      />
+
+      <div class="mt-14 grid gap-5 lg:grid-cols-3">
+        <CodeCard label="01 · get the code" title="Clone and install" code={setupCode} />
+        <CodeCard label="02 · dispatcher core" title="Check tooling, run a smoke test" code={coreCode} />
+        <CodeCard label="03 · admin panel" title="Run the ledger and ingest log" code={panelCode} />
+      </div>
+
+      <div
+        class="mt-10 flex flex-wrap items-center gap-4 rounded-2xl border border-base-content/10 bg-base-content/[0.02] p-6"
+      >
+        <Icon name="exclamation-triangle" class="size-5 text-warning" />
+        <p class="text-sm text-base-content/60">
+          <span class="font-semibold text-base-content/80">Development defaults are placeholders.</span>{" "}
+          Review the{" "}
+          <a
+            href="https://github.com/wrbl606/fleet/blob/main/docs/security.md"
+            class="text-primary underline">security docs</a
+          >{" "}
+          before exposing a host.
+        </p>
+      </div>
+    </section>
+
+    <!-- Docs -->
+    <section id="docs" class="mx-auto max-w-7xl px-6 py-20 lg:px-8">
+      <SectionHeading
+        eyebrow="documentation"
+        title="Read the fine print"
+        subtitle="Installation, triggers, and the deeper references — all versioned with the code."
+      />
+      <div class="mt-14 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        {
+          docs.map((doc) => (
+            <a
+              href={doc.href}
+              data-astro-prefetch={doc.href.startsWith("/") ? true : undefined}
+              class="group flex flex-col justify-between rounded-2xl border border-base-content/10 bg-base-content/[0.02] p-5 transition hover:-translate-y-1 hover:border-primary/30 hover:bg-base-content/[0.04]"
+            >
+              <div class="mb-6 inline-grid size-10 place-items-center rounded-lg border border-base-content/10 bg-base-content/5 text-base-content/60 transition group-hover:text-primary">
+                <Icon name="document-text" class="size-5" />
+              </div>
+              <div>
+                <div class="font-mono text-[13px] font-medium text-base-content/90">
+                  {doc.name}
+                </div>
+                <div class="mt-1 text-xs leading-relaxed text-base-content/50">{doc.detail}</div>
+              </div>
+            </a>
+          ))
+        }
+      </div>
+    </section>
+  </main>
+
+  <Footer />
+</Layout>

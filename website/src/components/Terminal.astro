@@ -1,0 +1,44 @@
+---
+import { terminalLines } from "../data";
+
+const stats = [
+  { value: "0", label: "GitHub tokens given to agents" },
+  { value: "PR-only", label: "Delivery channel" },
+  { value: "Fail-closed", label: "COI & native runners" },
+];
+---
+
+<div class="min-w-0 animate-fade-up [animation-delay:120ms]">
+  <div
+    class="overflow-hidden rounded-2xl border border-white/10 bg-[#0b0d17]/90 shadow-2xl shadow-black/50 backdrop-blur"
+  >
+    <div class="flex items-center gap-2 border-b border-white/5 bg-white/[0.03] px-4 py-3">
+      <span class="size-3 rounded-full bg-[#ff5f57]"></span>
+      <span class="size-3 rounded-full bg-[#febc2e]"></span>
+      <span class="size-3 rounded-full bg-[#28c840]"></span>
+      <span class="ml-3 font-mono text-xs text-white/40">fleetctl · bounded run loop</span>
+    </div>
+    <div class="overflow-x-auto p-5 font-mono text-[13px] leading-relaxed text-white/80">
+      {
+        terminalLines.map((line) => (
+          <div class="whitespace-pre">
+            {line.map(([cls, text]) => (
+              <span class={cls}>{text}</span>
+            ))}
+          </div>
+        ))
+      }
+    </div>
+  </div>
+
+  <div class="mt-4 grid grid-cols-3 gap-4">
+    {
+      stats.map((stat) => (
+        <div class="rounded-xl border border-base-content/5 bg-base-content/[0.03] p-4">
+          <div class="font-mono text-lg font-semibold text-base-content">{stat.value}</div>
+          <div class="text-xs text-base-content/50">{stat.label}</div>
+        </div>
+      ))
+    }
+  </div>
+</div>

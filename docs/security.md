@@ -16,11 +16,15 @@
 - **Generic Webhook Trigger token**: the webhook URL includes a token backed by
   the Jenkins credential `fleet-webhook-token`; unauthenticated requests are
   rejected before the pipeline starts.
-- **HMAC (optional)**: for sources that sign payloads (e.g. GitHub
-  `X-Hub-Signature-256`), verify the signature over the raw body before
-  normalizing. Jira Cloud webhooks do not sign by default, so the token is the
-  primary control there. Use a per-source secret, rotate regularly, and keep
-  the Jenkins job's trigger token separate from the LLM/GitHub credentials.
+- **HMAC (GitHub)**: GitHub cannot set custom auth headers, so its webhooks to
+  the panel ingest entry point (`POST /api/ingest?source=github`) are
+  authenticated with a `X-Hub-Signature-256` HMAC over the raw body. Set the
+  shared secret as `FLEET_GITHUB_WEBHOOK_SECRET` (the same value as the GitHub
+  webhook's **Secret** field); `FleetAdminWeb.Plugs.ApiAuth` verifies it in
+  constant time. Jira Cloud webhooks do not sign by default, so the ingest
+  bearer token is the primary control there. Use a per-source secret, rotate
+  regularly, and keep the Jenkins trigger token separate from the LLM/GitHub
+  credentials.
 
 Unknown sources/events are rejected by the normalizer; every normalized event
 must additionally resolve through `registry.yaml` or the run fails.

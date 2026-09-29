@@ -11,6 +11,15 @@
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+
+# Load local secrets (FLEET_INGEST_TOKEN, etc.) from the git-ignored secrets.env.
+if [ -f "$REPO_ROOT/secrets.env" ]; then
+  set -a
+  # shellcheck disable=SC1091
+  . "$REPO_ROOT/secrets.env"
+  set +a
+fi
+
 STATE_DIR="${FLEET_JENKINS_STATE_DIR:-$HOME/.local/share/fleet/jenkins}"
 JENKINS_HOME="$STATE_DIR/jenkins-home"
 WAR="$STATE_DIR/jenkins.war"

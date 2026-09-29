@@ -53,6 +53,31 @@ defmodule FleetAdmin.TriggerTest do
     assert {:error, {:unknown_source, "bogus"}} = Trigger.trigger("bogus", "x", @payload)
   end
 
+  test "forward/4 sends the raw body without source validation or event injection" do
+    parent = self()
+
+    Req.Test.stub(FleetAdmin.Trigger, fn conn ->
+      send(parent, {:req, conn})
+      Req.Test.json(conn, %{"ok" => true})
+    end)
+
+    assert {:ok, %{status: 200}} =
+             Trigger.forward("linear", "issue_created", @payload,
+               extra_headers: [{"x-github-event", "issues"}]
+             )
+
+    assert_received {:req, conn}
+    assert conn.method == "POST"
+    assert conn.query_params["source"] == "linear"
+    assert conn.query_params["token"] == "test-webhook-token"
+    assert {"x-fleet-event", "issue_created"} in conn.req_headers
+    assert {"x-github-event", "issues"} in conn.req_headers
+
+    body = Jason.decode!(Req.Test.raw_body(conn))
+    refute Map.has_key?(body, "webhookEvent")
+    assert body["issue"]["key"] == "ENG-1"
+  end
+
   test "errors when no endpoint is configured" do
     previous = Application.get_env(:fleet_admin, :fleet_webhook_url)
     Application.put_env(:fleet_admin, :fleet_webhook_url, nil)

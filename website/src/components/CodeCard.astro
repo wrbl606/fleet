@@ -1,0 +1,21 @@
+---
+interface Props {
+  label: string;
+  title: string;
+  code: string;
+}
+
+const { label, title, code } = Astro.props;
+---
+
+<div class="flex min-w-0 flex-col overflow-hidden rounded-2xl border border-white/10 bg-[#0b0d17]/80">
+  <div class="border-b border-white/5 bg-white/[0.03] px-5 py-4">
+    <div class="font-mono text-[10px] uppercase tracking-[0.2em] text-primary/80">{label}</div>
+    <div class="mt-1 text-sm font-semibold text-white/90">{title}</div>
+  </div>
+  <div
+    class="min-w-0 flex-1 overflow-x-auto whitespace-pre p-5 font-mono text-xs leading-relaxed text-white/70"
+  >
+    {code}
+  </div>
+</div>

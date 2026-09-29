@@ -1,0 +1,117 @@
+---
+import DocsLayout from "../../layouts/DocsLayout.astro";
+
+const clone = `git clone https://github.com/wrbl606/fleet.git
+cd fleet`;
+
+const core = `python3 -m pip install -r requirements.txt
+python3 -m fleetctl env-check --platform linux`;
+
+const registry = `# write deployment-specific routing to the git-ignored overlay
+scripts/configure-registry.sh jira --project ENG --repo acme/engine --labels agent
+scripts/configure-registry.sh trusted acme/engine
+scripts/configure-registry.sh show --effective   # merged view`;
+
+const panel = `mise install
+bash admin/start.sh --host 0.0.0.0 --port 4000`;
+
+const smudge = `bash scripts/smoke.sh     # expected: PASS`;
+
+const checks = `bash scripts/ci.sh         # fleetctl unit tests + schema validation
+bash scripts/ci-admin.sh   # admin: compile --warnings-as-errors + format + tests`;
+---
+
+<DocsLayout
+  title="Installation"
+  description="Install fleet: prerequisites, the fleetctl dispatcher core, the trusted registry, the Phoenix admin panel, and Jenkins."
+>
+  <div class="docs-prose">
+    <p class="font-mono text-xs uppercase tracking-[0.3em] text-primary/80">installation</p>
+    <h1 class="mt-3 text-3xl font-bold tracking-tight text-base-content sm:text-4xl">Installation</h1>
+    <p class="text-lg">
+      fleet is glue, not a package: a host runs from a git checkout plus a state directory and the
+      external tools it already uses. Install the pieces you need — the dispatcher core and panel
+      run without Jenkins.
+    </p>
+
+    <h2>Prerequisites</h2>
+    <ul>
+      <li><strong>Python 3.11+</strong> and <code>pip</code> (PyYAML + jsonschema).</li>
+      <li><strong>git</strong> and the <strong>GitHub CLI</strong> (<code>gh</code>) on the runner host.</li>
+      <li><strong>Linux runners (COI):</strong> Incus and <code>coi</code>, with your user in <code>incus-admin</code>.</li>
+      <li><strong>Admin panel / website:</strong> Erlang &amp; Elixir (admin) through <a href="https://mise.jdx.dev/">mise</a>, Node (website), pinned in the repo <code>mise.toml</code>.</li>
+      <li><strong>Jenkins</strong> controller + build nodes (installed separately).</li>
+    </ul>
+
+    <h2>1. Get the code</h2>
+    <pre><code>{clone}</code></pre>
+
+    <h2>2. Dispatcher core</h2>
+    <p>
+      <code>fleetctl</code> owns normalize → resolve → plan → run → publish. It is stdlib-first and
+      runs identically on a laptop and in CI.
+    </p>
+    <pre><code>{core}</code></pre>
+
+    <h2>3. Trusted registry</h2>
+    <p>
+      Keep the tracked <code>registry.yaml</code> generic and write deployment-specific routing,
+      allowlists, and comment policy to the git-ignored <code>registry.local.yaml</code> overlay.
+    </p>
+    <pre><code>{registry}</code></pre>
+
+    <h2>4. Admin panel</h2>
+    <p>
+      The panel owns the run ledger and the webhook ingest endpoint. It defaults to{" "}
+      <code>0.0.0.0:4000</code> and migrates the database on start.
+    </p>
+    <pre><code>{panel}</code></pre>
+    <table>
+      <thead>
+        <tr><th>Env var</th><th>Purpose</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>FLEET_INGEST_TOKEN</code></td><td>Bearer token for <code>POST /api/ingest</code>, <code>POST /api/trigger</code>, and <code>GET /api/metrics</code></td></tr>
+        <tr><td><code>FLEET_WEBHOOK_URL</code></td><td>Dispatcher endpoint inbound webhooks are forwarded to (Jenkins GWT invoke URL)</td></tr>
+        <tr><td><code>FLEET_WEBHOOK_TOKEN</code></td><td>Token appended to the forward URL and sent as a bearer header</td></tr>
+        <tr><td><code>FLEET_INGEST_PUBLIC_URL</code></td><td>Public URL of the panel ingest endpoint, shown on the Trigger page</td></tr>
+        <tr><td><code>FLEET_GITHUB_WEBHOOK_SECRET</code></td><td>GitHub webhook secret for <code>X-Hub-Signature-256</code> HMAC auth</td></tr>
+        <tr><td><code>FLEET_JENKINS_URL</code></td><td>Jenkins master web UI, linked from the nav and Trigger page</td></tr>
+        <tr><td><code>GITHUB_TOKEN</code></td><td>GitOps config PRs (<code>contents:write</code>, <code>pull-requests:write</code>)</td></tr>
+        <tr><td><code>FLEET_ADMIN_USER</code> / <code>FLEET_ADMIN_PASSWORD</code></td><td>Optional HTTP Basic auth for the UI</td></tr>
+      </tbody>
+    </table>
+    <p>Pages: <code>/</code> run ledger, <code>/ingest</code> ingest log, <code>/trigger</code> manual trigger, <code>/gitops</code> config PRs.</p>
+
+    <h2>5. Jenkins</h2>
+    <p>
+      Jenkins is <strong>not bundled</strong>. The dispatcher core and panel run without it, but the
+      webhook → pipeline → PR flow needs a Jenkins you operate. For a local WAR install use the
+      helper scripts; otherwise install the plugins from <code>scripts/jenkins/plugins.txt</code>,
+      add this repo as a global shared library named <code>fleet-config</code>, provide nodes
+      labeled{" "}
+      <code>fleet-agent</code>, and create the credentials{" "}
+      <code>fleet-webhook-token</code>, <code>fleet-github-read</code>,
+      <code>fleet-github-token</code>, and one per <code>[agent].llm_env</code>. See{" "}
+      <a data-astro-prefetch href="/docs/triggers">Triggers &amp; ingest</a> for the webhook wiring.
+    </p>
+
+    <h2>6. Landing page (optional)</h2>
+    <p>The marketing site is a static Astro build in <code>website/</code>.</p>
+    <pre><code>{`bash website/start.sh            # dev server on 0.0.0.0:4100
+bash website/start.sh --build    # production build + preview
+bash website/start.sh --daemon   # background; stop with website/stop.sh`}</code></pre>
+
+    <h2>7. Verify</h2>
+    <p>Run the sandbox smoke test (no LLM key required) and the CI checks.</p>
+    <pre><code>{smudge}
+
+{checks}</code></pre>
+
+    <h2>Next</h2>
+    <p>
+      Configure how tasks enter fleet in <a data-astro-prefetch href="/docs/triggers">Triggers &amp; ingest</a>, or read
+      the <a href="https://github.com/wrbl606/fleet/blob/main/docs/security.md">security model</a>.
+    </p>
+  </div>
+</DocsLayout>

@@ -19,6 +19,15 @@ set -euo pipefail
 
 cd "$(dirname "$0")"
 
+# Load local secrets (FLEET_INGEST_TOKEN, FLEET_ADMIN_USER/PASSWORD, ...) from
+# the git-ignored secrets.env so restarts keep the real values.
+if [ -f ../secrets.env ]; then
+  set -a
+  # shellcheck disable=SC1091
+  . ../secrets.env
+  set +a
+fi
+
 HOST="${PHX_IP:-0.0.0.0}"
 PORT="${PORT:-4000}"
 

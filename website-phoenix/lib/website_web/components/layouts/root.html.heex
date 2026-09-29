@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="csrf-token" content={get_csrf_token()} />
+
+    <% page_title = assigns[:page_title] || "fleet — safe remote AI implementation"
+
+    page_description =
+      assigns[:page_description] ||
+        "fleet lets a team hand real engineering tasks to an AI coding agent without trusting it. The agent works in a locked-down sandbox on your own hardware and delivers a human-reviewed pull request — no GitHub token, no open network, fail-closed policy."
+
+    canonical_url = url(~p"/")
+    og_image = url(~p"/images/og.png") %>
+
+    <.live_title default={page_title} phx-no-format>{assigns[:page_title]}</.live_title>
+
+    <meta name="description" content={page_description} />
+    <meta
+      name="keywords"
+      content="AI coding agent, safe remote implementation, sandboxed agent, prompt injection defense, Jenkins, Incus, COI, Seatbelt, pull request automation, secure AI, fleetctl, Phoenix LiveView"
+    />
+    <meta name="author" content="fleet" />
+    <meta name="robots" content="index, follow, max-image-preview:large" />
+    <meta name="theme-color" content="#0b0d17" />
+    <link rel="canonical" href={canonical_url} />
+
+    <link rel="icon" href={~p"/favicon.ico"} sizes="any" />
+    <link rel="icon" type="image/svg+xml" href={~p"/images/favicon.svg"} />
+    <link rel="apple-touch-icon" href={~p"/images/icon.png"} />
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="fleet" />
+    <meta property="og:title" content={page_title} />
+    <meta property="og:description" content={page_description} />
+    <meta property="og:url" content={canonical_url} />
+    <meta property="og:image" content={og_image} />
+    <meta property="og:image:type" content="image/png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta
+      property="og:image:alt"
+      content="fleet — safe remote AI implementation. No agent GitHub token, fail-closed sandbox, PR-only delivery."
+    />
+    <meta property="og:locale" content="en_US" />
+
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content={page_title} />
+    <meta name="twitter:description" content={page_description} />
+    <meta name="twitter:image" content={og_image} />
+    <meta
+      name="twitter:image:alt"
+      content="fleet — safe remote AI implementation. No agent GitHub token, fail-closed sandbox, PR-only delivery."
+    />
+
+    <script type="application/ld+json" phx-no-curly-interpolation>
+      {
+        "@context": "https://schema.org",
+        "@graph": [
+          {
+            "@type": "WebSite",
+            "name": "fleet",
+            "url": "<%= canonical_url %>",
+            "description": "<%= page_description %>"
+          },
+          {
+            "@type": "SoftwareApplication",
+            "name": "fleet",
+            "applicationCategory": "DeveloperApplication",
+            "operatingSystem": "Linux, macOS, Windows",
+            "description": "<%= page_description %>",
+            "url": "<%= canonical_url %>",
+            "image": "<%= og_image %>",
+            "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+            "featureList": [
+              "AI coding agent in a disposable, locked-down sandbox",
+              "No GitHub token given to the agent",
+              "Fail-closed native and containerized runners",
+              "Central, versioned routing and policy registry",
+              "Human-reviewed pull request delivery"
+            ]
+          }
+        ]
+      }
+    </script>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <link phx-track-static rel="stylesheet" href={~p"/assets/css/app.css"} />
+    <script defer phx-track-static type="text/javascript" src={~p"/assets/js/app.js"}>
+    </script>
+    <script>
+      (() => {
+        const systemTheme = () => matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+
+        const setTheme = (theme) => {
+          if (theme === "system") {
+            localStorage.removeItem("phx:theme");
+            document.documentElement.setAttribute("data-theme", systemTheme());
+            document.documentElement.setAttribute("data-theme-source", "system");
+          } else {
+            localStorage.setItem("phx:theme", theme);
+            document.documentElement.setAttribute("data-theme", theme);
+            document.documentElement.setAttribute("data-theme-source", "user");
+          }
+        };
+        if (!document.documentElement.hasAttribute("data-theme")) {
+          setTheme(localStorage.getItem("phx:theme") || "dark");
+        }
+        window.addEventListener("storage", (e) => e.key === "phx:theme" && setTheme(e.newValue || "system"));
+        window.addEventListener("phx:set-theme", (e) => setTheme(e.target.dataset.phxTheme));
+
+        matchMedia("(prefers-color-scheme: dark)").addEventListener("change", (e) => {
+          if (document.documentElement.getAttribute("data-theme-source") === "system") {
+            document.documentElement.setAttribute("data-theme", systemTheme());
+          }
+        });
+      })();
+    </script>
+  </head>
+  <body>
+    {@inner_content}
+  </body>
+</html>

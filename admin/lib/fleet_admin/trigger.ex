@@ -49,6 +49,29 @@ defmodule FleetAdmin.Trigger do
     end
   end
 
+  @doc """
+  Forward a raw PM-tool webhook to the configured dispatcher unchanged.
+
+  Unlike `trigger/4`, `source` is not restricted to `#{inspect(@sources)}` — the
+  dispatcher's normalizers decide whether an event is actionable — and the body
+  is sent verbatim (no `webhookEvent` injection). Used by the ingest entry point
+  (`POST /api/ingest?source=...`).
+
+  Options: `:dry_run`, `:req_options`, and `:extra_headers` (a list of
+  `{name, value}` pairs copied from the inbound request, e.g. GitHub's
+  `x-github-event` / `x-github-delivery`).
+  """
+  def forward(source, event, payload, opts \\ []) do
+    with :ok <- validate_configured(),
+         {:ok, body} <- decode_payload(payload) do
+      if Keyword.get(opts, :dry_run, false) do
+        {:ok, %{dry_run: true, status: nil, url: endpoint(source), body: body}}
+      else
+        do_request(source, event, body, opts)
+      end
+    end
+  end
+
   # -- request -------------------------------------------------------------
 
   defp do_request(source, event, body, opts) do
@@ -67,7 +90,7 @@ defmodule FleetAdmin.Trigger do
       Req.new(
         method: :post,
         url: Application.get_env(:fleet_admin, :fleet_webhook_url),
-        headers: headers(event),
+        headers: headers(event, Keyword.get(opts, :extra_headers, [])),
         params: params,
         json: body,
         retry: false
@@ -83,10 +106,11 @@ defmodule FleetAdmin.Trigger do
     end
   end
 
-  defp headers(event) do
+  defp headers(event, extra) do
     base = [{"accept", "application/json"}, {"user-agent", "fleet-admin"}]
     base = if is_binary(event) and event != "", do: [{"x-fleet-event", event} | base], else: base
-    maybe_auth_header(base, Application.get_env(:fleet_admin, :fleet_webhook_token))
+    base = maybe_auth_header(base, Application.get_env(:fleet_admin, :fleet_webhook_token))
+    extra ++ base
   end
 
   defp maybe_auth_header(headers, token) when is_binary(token) and token != "",

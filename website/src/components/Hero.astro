@@ -1,0 +1,58 @@
+---
+import Icon from "./Icon.astro";
+import Terminal from "./Terminal.astro";
+---
+
+<section id="top" class="mx-auto max-w-7xl px-6 pb-20 pt-20 lg:px-8 lg:pt-28">
+  <div class="grid items-center gap-16 lg:grid-cols-[1.05fr_1fr]">
+    <div class="min-w-0 animate-fade-up">
+      <h1 class="text-5xl font-extrabold leading-[1.05] tracking-tight sm:text-6xl lg:text-7xl">
+        Hand real tasks to an AI <span class="text-gradient"> without trusting it.</span>
+      </h1>
+
+      <p class="mt-6 max-w-xl text-lg leading-relaxed text-base-content/70">
+        fleet triggers an agent from the tools your team already uses — Jira or a GitHub{" "}
+        <code class="rounded bg-base-content/5 px-1.5 py-0.5 font-mono text-sm text-base-content/90"
+          >/agent</code
+        >{" "}
+        PR comment — works inside a locked-down sandbox on your own hardware, and delivers a change
+        as an ordinary pull request for human review.
+      </p>
+
+      <p class="mt-4 max-w-xl text-base-content/50">
+        The agent never holds a GitHub token, never gets open network access, and cannot widen its
+        own permissions.
+      </p>
+
+      <div class="mt-10 flex flex-wrap items-center gap-4">
+        <a
+          href="#start"
+          class="group inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-primary to-accent px-6 py-3 font-semibold text-primary-content shadow-lg shadow-primary/30 transition hover:shadow-xl hover:shadow-primary/40"
+        >
+          Run it in 5 minutes
+          <Icon name="arrow-right" class="size-4 transition group-hover:translate-x-0.5" />
+        </a>
+        <a
+          href="#security"
+          class="inline-flex items-center gap-2 rounded-xl border border-base-content/10 bg-base-content/5 px-6 py-3 font-semibold transition hover:border-base-content/20 hover:bg-base-content/10"
+        >
+          <Icon name="shield-check" class="size-4" /> Threat model
+        </a>
+      </div>
+
+      <div class="mt-10 flex flex-wrap gap-x-8 gap-y-4 text-sm text-base-content/50">
+        <span class="inline-flex items-center gap-2">
+          <Icon name="lock-closed" class="size-4 text-success" /> No GitHub token for the agent
+        </span>
+        <span class="inline-flex items-center gap-2">
+          <Icon name="no-symbol" class="size-4 text-success" /> Fail-closed sandbox
+        </span>
+        <span class="inline-flex items-center gap-2">
+          <Icon name="code-bracket-square" class="size-4 text-success" /> Human-reviewed delivery
+        </span>
+      </div>
+    </div>
+
+    <Terminal />
+  </div>
+</section>

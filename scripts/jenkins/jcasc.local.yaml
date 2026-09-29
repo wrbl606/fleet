@@ -38,8 +38,10 @@ jenkins:
           # Post run.finished back to the admin panel (start with admin/start.sh).
           - key: "FLEET_INGEST_URL"
             value: "http://localhost:4000/api/ingest"
+          # From secrets.env via scripts/jenkins/start.sh (falls back to the
+          # local placeholder when unset).
           - key: "FLEET_INGEST_TOKEN"
-            value: "local-dev-token"
+            value: "${FLEET_INGEST_TOKEN:-local-dev-token}"
           # Optional, git-ignored overlay with deployment-specific repos/projects
           # (e.g. allowlist.trusted_repos). Absolute host path; empty disables.
           - key: "FLEET_REGISTRY_LOCAL"

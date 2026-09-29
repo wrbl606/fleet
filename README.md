@@ -141,7 +141,7 @@ python3 -m fleetctl validate --registry registry.yaml \
 Runs `setup → agent → verify` **inside a real COI container** with a stub agent:
 
 ```bash
-bash scripts/p0-smoke.sh     # expected: [p0] PASS
+bash scripts/smoke.sh     # expected: [smoke] PASS
 ```
 
 ### Admin panel
@@ -156,8 +156,9 @@ DB is migrated. For the raw flow: `cd admin && mix setup && mix phx.server`.
 
 Runtime env (see [`admin/README.md`](./admin/README.md)):
 `FLEET_INGEST_TOKEN`, `GITHUB_TOKEN`, `FLEET_WEBHOOK_URL` / `FLEET_WEBHOOK_TOKEN`
-(for the **Trigger** page), `FLEET_JENKINS_URL` (link to the Jenkins master),
-optional `FLEET_ADMIN_USER` / `FLEET_ADMIN_PASSWORD`.
+(the dispatcher the ingest entry point forwards to), `FLEET_JENKINS_URL` (link to
+the Jenkins master), optional `FLEET_INGEST_PUBLIC_URL` (public ingest URL shown
+on the **Trigger** page), optional `FLEET_ADMIN_USER` / `FLEET_ADMIN_PASSWORD`.
 
 Pages: `/` run ledger, `/ingest` ingest log, `/trigger` manual trigger,
 `/gitops` config PRs.
@@ -207,27 +208,36 @@ Install the plugins in `scripts/jenkins/plugins.txt`, then:
    `.../generic-webhook-trigger/invoke?token=<fleet-webhook-token>&source=jira`.
 5. Add `.fleet/` to each source repo (copy `examples/sample-repo/.fleet/`).
 
-Point the admin panel's Trigger page at the same invoke URL via
-`FLEET_WEBHOOK_URL` / `FLEET_WEBHOOK_TOKEN`.
+The panel forwards to that invoke URL via `FLEET_WEBHOOK_URL` /
+`FLEET_WEBHOOK_TOKEN` (see the ingest entry point below).
 
 ### Webhooks
 
-Everything enters through the Jenkins **Generic Webhook Trigger**, authenticated
-by the `fleet-webhook-token` shared secret in the query string.
+External senders POST to the **panel ingest endpoint**, authenticated by the
+`FLEET_INGEST_TOKEN` bearer secret — except GitHub, which cannot set custom
+headers and instead uses its webhook **Secret** (HMAC `X-Hub-Signature-256` over
+the raw body, configured as `FLEET_GITHUB_WEBHOOK_SECRET`). The panel records the
+event as `webhook.received` and forwards the raw body to the Jenkins **Generic
+Webhook Trigger** (the trusted `FLEET_WEBHOOK_URL`), which does the validation
+and normalization. The same payloads can also be sent straight to Jenkins when
+the panel is not in the path.
 
-| Source | URL | Events |
-|---|---|---|
-| Jira | `POST {jenkins}/generic-webhook-trigger/invoke?token={fleet-webhook-token}&source=jira` | `jira:issue_created`, `jira:issue_updated` (a label change adding the trigger label) |
-| GitHub | `POST {jenkins}/generic-webhook-trigger/invoke?token={fleet-webhook-token}&source=github` (content type `application/json`) | `issues`, `issue_comment`, `pull_request_review_comment` — the event name comes from the `X-GitHub-Event` header |
-| Linear | `POST {jenkins}/generic-webhook-trigger/invoke?token={fleet-webhook-token}&source=linear` | `Issue` create/update |
+| Source | URL | Auth | Events |
+|---|---|---|---|
+| Jira | `POST {panel}/api/ingest?source=jira` | bearer | `jira:issue_created`, `jira:issue_updated` (a label change adding the trigger label) |
+| GitHub | `POST {panel}/api/ingest?source=github` (content type `application/json`) | webhook **Secret** (HMAC) | `issues`, `issue_comment`, `pull_request_review_comment` — the event name comes from the `X-GitHub-Event` header (passed through) |
+| Linear | `POST {panel}/api/ingest?source=linear` | bearer | `Issue` create/update |
 
-The panel also exposes its own endpoints (bearer `FLEET_INGEST_TOKEN`):
+The panel's API endpoints (bearer `FLEET_INGEST_TOKEN`, or GitHub HMAC for
+`source=github`):
 
-- `POST /api/ingest` — run lifecycle + debug events: `run.started`,
-  `run.finished`, `audit.event`, `webhook.received`, `normalize.result`,
-  `resolve.result`.
-- `POST /api/trigger` — trigger a run through the panel (same path as the
-  Trigger page).
+- `POST /api/ingest?source=<source>` — inbound webhook entry point: records the
+  event and forwards it to the dispatcher.
+- `POST /api/ingest` (no `source`) — dispatcher lifecycle + debug events:
+  `run.started`, `run.finished`, `audit.event`, `webhook.received`,
+  `normalize.result`, `resolve.result`. These are recorded, never forwarded.
+- `POST /api/trigger` — low-level: forward to the dispatcher without the panel
+  ingest hop (same code path as the Trigger page used to use).
 
 > **Dev defaults — change them for any real deployment.** The bundled local
 > Jenkins and panel use the placeholder values `admin`/`admin`,
@@ -323,7 +333,7 @@ Migrations are additive, so the running panel keeps serving during a pull.
 ```bash
 bash scripts/ci.sh          # fleetctl + schema validation
 bash scripts/ci-admin.sh    # admin compile/format/tests
-bash scripts/p0-smoke.sh    # sandbox smoke (no LLM key)
+bash scripts/smoke.sh    # sandbox smoke (no LLM key)
 ```
 
 Then a real smoke through the flow: use the panel **Trigger** page (or
@@ -384,6 +394,8 @@ repos cannot widen network/resource policy. Full model:
 
 | Doc | Contents |
 |---|---|
+| [`docs/installation.md`](./docs/installation.md) | Install the host, dispatcher, panel, and Jenkins |
+| [`docs/triggers.md`](./docs/triggers.md) | Ingest endpoint, forwarding, PM-source webhook setup |
 | [`docs/fleet-contract.md`](./docs/fleet-contract.md) | `.fleet/` contract + templating |
 | [`docs/runner-backends.md`](./docs/runner-backends.md) | COI / native backends, routing, secret injection |
 | [`docs/coi-images.md`](./docs/coi-images.md) | Custom COI images (e.g. the Flutter profile) |

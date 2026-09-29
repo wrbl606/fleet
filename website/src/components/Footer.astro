@@ -1,0 +1,29 @@
+---
+import Icon from "./Icon.astro";
+import { githubUrl } from "../data";
+---
+
+<footer class="border-t border-base-content/5 bg-base-content/[0.03]">
+  <div
+    class="mx-auto flex max-w-7xl flex-col items-center justify-between gap-6 px-6 py-12 lg:flex-row lg:px-8"
+  >
+    <div class="flex items-center gap-3">
+      <span
+        class="grid size-8 place-items-center rounded-lg bg-gradient-to-br from-primary to-accent text-primary-content"
+      >
+        <Icon name="command-line" class="size-4" />
+      </span>
+      <span class="text-sm text-base-content/50">
+        <span class="font-mono text-base-content/80">fleet</span>
+        — delegate the typing. Keep the authority.
+      </span>
+    </div>
+    <a
+      href={githubUrl}
+      rel="noopener noreferrer"
+      class="text-sm text-base-content/50 transition hover:text-base-content"
+    >
+      {githubUrl}
+    </a>
+  </div>
+</footer>

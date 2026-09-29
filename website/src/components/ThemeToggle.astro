@@ -1,0 +1,46 @@
+---
+import Icon from "./Icon.astro";
+---
+
+<div
+  id="theme-toggle"
+  class="relative flex flex-row items-center rounded-full border-2 border-base-300 bg-base-300"
+>
+  <div
+    class="absolute left-0 h-full w-1/3 rounded-full border border-base-200 bg-base-100 brightness-200 transition-[left] [[data-theme=light]_&]:left-1/3 [[data-theme=dark]_&]:left-2/3 [[data-theme-source=system]_&]:!left-0"
+  >
+  </div>
+
+  <button
+    type="button"
+    class="flex w-1/3 cursor-pointer p-2"
+    data-theme="system"
+    aria-label="Use system theme"
+  >
+    <Icon name="computer-desktop-20-solid" class="size-4 opacity-75 hover:opacity-100" />
+  </button>
+  <button
+    type="button"
+    class="flex w-1/3 cursor-pointer p-2"
+    data-theme="light"
+    aria-label="Use light theme"
+  >
+    <Icon name="sun-20-solid" class="size-4 opacity-75 hover:opacity-100" />
+  </button>
+  <button
+    type="button"
+    class="flex w-1/3 cursor-pointer p-2"
+    data-theme="dark"
+    aria-label="Use dark theme"
+  >
+    <Icon name="moon-20-solid" class="size-4 opacity-75 hover:opacity-100" />
+  </button>
+</div>
+
+<script>
+  document.querySelectorAll<HTMLButtonElement>("#theme-toggle [data-theme]").forEach((button) => {
+    button.addEventListener("click", () => {
+      button.dispatchEvent(new CustomEvent("fleet:set-theme", { bubbles: true }));
+    });
+  });
+</script>

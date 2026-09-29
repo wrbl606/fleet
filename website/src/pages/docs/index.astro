@@ -1,0 +1,83 @@
+---
+import DocsLayout from "../../layouts/DocsLayout.astro";
+import Icon from "../../components/Icon.astro";
+
+const guides = [
+  {
+    href: "/docs/installation",
+    title: "Installation",
+    detail: "Set up the host, dispatcher core, trusted registry, admin panel, and Jenkins.",
+    icon: "wrench-screwdriver",
+  },
+  {
+    href: "/docs/triggers",
+    title: "Triggers & ingest",
+    detail: "Point Jira, GitHub, or Linear at the ingest endpoint and forward to Jenkins.",
+    icon: "bolt",
+  },
+];
+---
+
+<DocsLayout
+  title="Documentation"
+  description="Install fleet and configure triggers: the admin ingest endpoint, forwarding to Jenkins, and PM-source webhooks."
+>
+  <div class="docs-prose">
+    <p class="font-mono text-xs uppercase tracking-[0.3em] text-primary/80">documentation</p>
+    <h1 class="mt-3 text-3xl font-bold tracking-tight text-base-content sm:text-4xl">
+      fleet documentation
+    </h1>
+    <p class="text-lg">
+      How to install the dispatcher and panel, and how tasks enter the system — from a PM tool
+      webhook, through the panel's ingest endpoint, and on to the Jenkins Generic Webhook Trigger.
+    </p>
+  </div>
+
+  <div class="mt-10 grid gap-4 sm:grid-cols-2">
+    {
+      guides.map((guide) => (
+        <a
+          href={guide.href}
+          data-astro-prefetch
+          class="group rounded-2xl border border-base-content/10 bg-base-content/[0.02] p-6 transition hover:-translate-y-1 hover:border-primary/30 hover:bg-base-content/[0.04]"
+        >
+          <div class="mb-4 inline-grid size-11 place-items-center rounded-xl border border-base-content/10 bg-base-content/5 text-primary">
+            <Icon name={guide.icon} class="size-5" />
+          </div>
+          <h2 class="text-lg font-semibold tracking-tight text-base-content">{guide.title}</h2>
+          <p class="mt-2 text-sm leading-relaxed text-base-content/60">{guide.detail}</p>
+        </a>
+      ))
+    }
+  </div>
+
+  <div class="docs-prose mt-10">
+    <h2>What lives where</h2>
+    <ul>
+      <li>
+        <a data-astro-prefetch href="/docs/installation">Installation</a> — toolchain, <code>fleetctl</code>, registry
+        overlay, admin panel, and the Jenkins job.
+      </li>
+      <li>
+        <a data-astro-prefetch href="/docs/triggers">Triggers &amp; ingest</a> — the <code>POST /api/ingest</code>{" "}
+        endpoint (record + forward), authentication, the <code>x-fleet-*</code> headers, and the
+        Jenkins Generic Webhook Trigger wiring.
+      </li>
+      <li>
+        Deeper references are kept alongside the code in{" "}
+        <a href="https://github.com/wrbl606/fleet/tree/main/docs">docs/</a> — contract, runner
+        backends, security model, host hardening, and scale/observability.
+      </li>
+    </ul>
+
+    <h2>Ingest in one paragraph</h2>
+    <p>
+      External senders POST to the admin panel's <code>/api/ingest?source=&lt;source&gt;</code>{" "}
+      endpoint. The panel records the event as <code>webhook.received</code> in the run ledger and
+      forwards the raw body verbatim to the configured dispatcher (<code>FLEET_WEBHOOK_URL</code>,
+      normally the Jenkins Generic Webhook Trigger). Without a <code>source</code>, the same
+      endpoint is a ledger sink for the dispatcher's own lifecycle events and never forwards. See{" "}
+      <a data-astro-prefetch href="/docs/triggers">Triggers &amp; ingest</a>.
+    </p>
+  </div>
+</DocsLayout>

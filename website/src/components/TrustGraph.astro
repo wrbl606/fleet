@@ -1,0 +1,157 @@
+---
+// Dependency + trust graph. Solid edges are dependencies/orchestration; dashed
+// accent edges are credential handoffs bound by Jenkins. Edge labels carry a
+// background halo so no line ever runs through text. Coordinates are laid out
+// so edges keep lanes and never cross each other or the node boxes.
+---
+
+<div class="w-full overflow-x-auto">
+  <svg
+    viewBox="0 0 940 640"
+    class="mx-auto h-auto w-full min-w-[760px] max-w-4xl"
+    role="img"
+    aria-label="Dependency graph. Senders reach the admin panel, which forwards to the Jenkins controller. Jenkins starts stages on fleetctl, binds credentials and routes the run. fleetctl drives the isolated sandbox where the agent runs, and hands a passing change to the trusted publisher, which pushes a pull request to GitHub. Jenkins hands the LLM key to the agent, a read token to the clone step, and a scoped write token to the publisher; the agent never receives a GitHub token."
+  >
+    <defs>
+      <marker
+        id="arrow"
+        viewBox="0 0 10 10"
+        refX="9"
+        refY="5"
+        markerWidth="7"
+        markerHeight="7"
+        orient="auto-start-reverse"
+      >
+        <path d="M0,0 L10,5 L0,10 z" class="fill-base-content/50"></path>
+      </marker>
+      <marker
+        id="arrow-secret"
+        viewBox="0 0 10 10"
+        refX="9"
+        refY="5"
+        markerWidth="7"
+        markerHeight="7"
+        orient="auto-start-reverse"
+      >
+        <path d="M0,0 L10,5 L0,10 z" class="fill-primary"></path>
+      </marker>
+    </defs>
+
+    <!-- isolated zone (the trust boundary the LLM key crosses, and nothing else) -->
+    <rect
+      x="560"
+      y="230"
+      width="340"
+      height="240"
+      rx="16"
+      class="fill-primary/[0.04] stroke-primary/40"
+      stroke-width="1.5"
+      stroke-dasharray="6 5"></rect>
+    <text x="580" y="258" font-size="12" class="fill-primary/90" paint-order="stroke" stroke-width="5" style="stroke: var(--color-base-300)">
+      Isolated sandbox · COI / native
+    </text>
+    <text x="580" y="275" font-size="11" class="fill-primary/60" paint-order="stroke" stroke-width="5" style="stroke: var(--color-base-300)">
+      fail-closed · allowlisted egress
+    </text>
+
+    <!-- dependency edges -->
+    <path d="M180,85 L245,85" class="fill-none stroke-base-content/40" stroke-width="1.5" marker-end="url(#arrow)"></path>
+    <text x="212" y="75" text-anchor="middle" font-size="11" class="fill-base-content/50" paint-order="stroke" stroke-linejoin="round" stroke-width="5" style="stroke: var(--color-base-300)">webhook</text>
+
+    <path d="M420,85 L490,85" class="fill-none stroke-base-content/40" stroke-width="1.5" marker-end="url(#arrow)"></path>
+    <text x="455" y="75" text-anchor="middle" font-size="11" class="fill-base-content/50" paint-order="stroke" stroke-linejoin="round" stroke-width="5" style="stroke: var(--color-base-300)">forward</text>
+
+    <path d="M540,120 L330,250" class="fill-none stroke-base-content/40" stroke-width="1.5" marker-end="url(#arrow)"></path>
+    <text x="459" y="170" text-anchor="middle" font-size="11" class="fill-base-content/50" paint-order="stroke" stroke-linejoin="round" stroke-width="5" style="stroke: var(--color-base-300)">starts stages</text>
+
+    <path d="M450,290 L610,357" class="fill-none stroke-base-content/40" stroke-width="1.5" marker-end="url(#arrow)"></path>
+    <text x="500" y="311" text-anchor="middle" font-size="11" class="fill-base-content/50" paint-order="stroke" stroke-linejoin="round" stroke-width="5" style="stroke: var(--color-base-300)">runs the loop</text>
+
+    <path d="M350,330 L350,500" class="fill-none stroke-base-content/40" stroke-width="1.5" marker-end="url(#arrow)"></path>
+    <text x="350" y="415" text-anchor="middle" font-size="11" class="fill-base-content/50" paint-order="stroke" stroke-linejoin="round" stroke-width="5" style="stroke: var(--color-base-300)">on verify pass</text>
+
+    <path d="M450,540 L610,540" class="fill-none stroke-base-content/40" stroke-width="1.5" marker-end="url(#arrow)"></path>
+    <text x="530" y="540" text-anchor="middle" font-size="11" class="fill-base-content/50" paint-order="stroke" stroke-linejoin="round" stroke-width="5" style="stroke: var(--color-base-300)">push · open PR</text>
+
+    <!-- secret handoffs from Jenkins -->
+    <path
+      d="M580,120 L410,250"
+      class="fill-none stroke-primary"
+      stroke-width="1.5"
+      stroke-dasharray="5 4"
+      marker-end="url(#arrow-secret)"></path>
+    <text x="475" y="200" text-anchor="middle" font-size="11" class="fill-primary" paint-order="stroke" stroke-linejoin="round" stroke-width="5" style="stroke: var(--color-base-300)">read token</text>
+
+    <path
+      d="M730,120 C780,180 840,220 840,320"
+      class="fill-none stroke-primary"
+      stroke-width="1.5"
+      stroke-dasharray="5 4"
+      marker-end="url(#arrow-secret)"></path>
+    <text x="800" y="205" text-anchor="middle" font-size="11" class="fill-primary" paint-order="stroke" stroke-linejoin="round" stroke-width="5" style="stroke: var(--color-base-300)">LLM key</text>
+
+    <path
+      d="M500,120 C250,130 120,320 250,520"
+      class="fill-none stroke-primary"
+      stroke-width="1.5"
+      stroke-dasharray="5 4"
+      marker-end="url(#arrow-secret)"></path>
+    <text x="300" y="185" text-anchor="middle" font-size="11" class="fill-primary" paint-order="stroke" stroke-linejoin="round" stroke-width="5" style="stroke: var(--color-base-300)">write token</text>
+
+    <!-- nodes -->
+    <rect x="30" y="50" width="150" height="70" rx="12" class="fill-base-content/[0.03] stroke-base-content/20"></rect>
+    <text x="105" y="80" text-anchor="middle" font-size="13" class="fill-base-content">Senders</text>
+    <text x="105" y="99" text-anchor="middle" font-size="11" class="fill-base-content/50">Jira · GitHub · Linear</text>
+
+    <rect x="245" y="50" width="175" height="70" rx="12" class="fill-base-content/[0.03] stroke-base-content/20"></rect>
+    <text x="332" y="80" text-anchor="middle" font-size="13" class="fill-base-content">Admin panel</text>
+    <text x="332" y="99" text-anchor="middle" font-size="11" class="fill-base-content/50">ingest · ledger</text>
+
+    <rect x="490" y="50" width="260" height="70" rx="12" class="fill-base-content/[0.03] stroke-base-content/20"></rect>
+    <text x="620" y="80" text-anchor="middle" font-size="13" class="fill-base-content">Jenkins controller</text>
+    <text x="620" y="99" text-anchor="middle" font-size="11" class="fill-base-content/50">
+      trigger · routing · credentials
+    </text>
+
+    <rect x="250" y="250" width="200" height="80" rx="12" class="fill-base-content/[0.03] stroke-base-content/20"></rect>
+    <text x="350" y="283" text-anchor="middle" font-size="13" class="fill-base-content">fleetctl</text>
+    <text x="350" y="302" text-anchor="middle" font-size="11" class="fill-base-content/50">
+      normalize · resolve · plan · run
+    </text>
+
+    <rect x="610" y="320" width="260" height="75" rx="12" class="fill-base-content/[0.06] stroke-base-content/25"></rect>
+    <text x="740" y="352" text-anchor="middle" font-size="13" class="fill-base-content">Agent</text>
+    <text x="740" y="371" text-anchor="middle" font-size="11" class="fill-base-content/50">
+      claude · codex · opencode
+    </text>
+    <text x="740" y="435" text-anchor="middle" font-size="11" class="fill-base-content/50">
+      holds no GitHub token
+    </text>
+
+    <rect x="250" y="500" width="200" height="80" rx="12" class="fill-base-content/[0.03] stroke-base-content/20"></rect>
+    <text x="350" y="533" text-anchor="middle" font-size="13" class="fill-base-content">
+      Trusted publisher
+    </text>
+    <text x="350" y="552" text-anchor="middle" font-size="11" class="fill-base-content/50">
+      push · gh pr create
+    </text>
+
+    <rect x="610" y="500" width="260" height="80" rx="12" class="fill-base-content/[0.03] stroke-base-content/20"></rect>
+    <text x="740" y="533" text-anchor="middle" font-size="13" class="fill-base-content">GitHub</text>
+    <text x="740" y="552" text-anchor="middle" font-size="11" class="fill-base-content/50">
+      repo · pull request
+    </text>
+
+    <!-- legend -->
+    <path d="M35,155 L75,155" class="fill-none stroke-base-content/40" stroke-width="1.5" marker-end="url(#arrow)"></path>
+    <text x="84" y="159" font-size="11" class="fill-base-content/50">dependency</text>
+
+    <path
+      d="M35,183 L75,183"
+      class="fill-none stroke-primary"
+      stroke-width="1.5"
+      stroke-dasharray="5 4"
+      marker-end="url(#arrow-secret)"></path>
+    <text x="84" y="187" font-size="11" class="fill-primary">secret handoff (Jenkins)</text>
+  </svg>
+</div>

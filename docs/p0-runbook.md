@@ -35,7 +35,7 @@ python3 -m fleetctl env-check --platform linux
 ## 3. Run the smoke test
 
 ```bash
-bash scripts/p0-smoke.sh
+bash scripts/smoke.sh
 ```
 
 What it does:
@@ -50,7 +50,7 @@ What it does:
 Expected tail:
 
 ```
-[p0] PASS: setup -> agent -> verify succeeded inside COI
+[smoke] PASS: setup -> agent -> verify succeeded inside COI
 ```
 
 ## 4. Manual COI checks (optional)

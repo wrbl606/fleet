@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# P0 smoke test: prove the full dispatcher path against real COI with a
+# Smoke test: prove the full dispatcher path against real COI with a
 # deterministic stub agent (no LLM key needed).
 #
 #   plan -> trusted COI config -> coi run setup -> coi run agent -> coi run verify
@@ -10,20 +10,20 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
-echo "[p0] checking tooling"
+echo "[smoke] checking tooling"
 python3 -m fleetctl env-check --platform linux >/tmp/fleet-env-check.json || {
   cat /tmp/fleet-env-check.json
-  echo "[p0] missing host tooling" >&2
+  echo "[smoke] missing host tooling" >&2
   exit 1
 }
 
-WORK="$(mktemp -d /tmp/fleet-p0-XXXXXX)"
+WORK="$(mktemp -d /tmp/fleet-smoke-XXXXXX)"
 trap 'rm -rf "$WORK"' EXIT
 
-echo "[p0] staging stub-repo at $WORK/workspace"
+echo "[smoke] staging stub-repo at $WORK/workspace"
 cp -r tests/fixtures/stub-repo "$WORK/workspace"
 
-echo "[p0] normalizing + planning"
+echo "[smoke] normalizing + planning"
 python3 -m fleetctl normalize \
   --source jira \
   --payload-file tests/fixtures/issue-created.json \
@@ -35,7 +35,7 @@ python3 -m fleetctl plan \
   --issue-file "$WORK/issue.json" \
   --out "$WORK/plan.json" >/dev/null
 
-echo "[p0] running bounded loop inside COI"
+echo "[smoke] running bounded loop inside COI"
 python3 -m fleetctl run \
   --plan-file "$WORK/plan.json" \
   --workspace "$WORK/workspace" \
@@ -44,7 +44,7 @@ python3 -m fleetctl run \
   --no-notify \
   --out "$WORK/result.json"
 
-echo "[p0] result:"
+echo "[smoke] result:"
 cat "$WORK/result.json"
 
 python3 - "$WORK/result.json" <<'PY'
@@ -53,5 +53,5 @@ result = json.load(open(sys.argv[1]))
 assert result["status"] == "succeeded", result
 assert len(result["iterations"]) == 1, result
 assert result["iterations"][0]["verify"]["exit_code"] == 0, result
-print("[p0] PASS: setup -> agent -> verify succeeded inside COI")
+print("[smoke] PASS: setup -> agent -> verify succeeded inside COI")
 PY

@@ -7,3 +7,5 @@ erlang = "28.5"
 elixir = "1.20.4-otp-28"
 # JDK for the local Jenkins WAR (Jenkins is installed separately; see README).
 java = "21.0.2"
+# Node toolchain for the Astro landing page (website/).
+node = "26"

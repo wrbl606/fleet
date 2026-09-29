@@ -1,0 +1,57 @@
+---
+import Icon from "./Icon.astro";
+import ThemeToggle from "./ThemeToggle.astro";
+import { githubUrl } from "../data";
+
+// Absolute so the section anchors also work from the /docs pages.
+const links = [
+  { href: "/#security", label: "Security" },
+  { href: "/#stack", label: "Stack" },
+  { href: "/#concepts", label: "Concepts" },
+  { href: "/#start", label: "Quickstart" },
+  { href: "/docs", label: "Docs" },
+];
+---
+
+<header class="sticky top-0 z-50 border-b border-base-content/5 bg-base-300/70 backdrop-blur-xl">
+  <div class="mx-auto flex max-w-7xl items-center justify-between px-6 py-4 lg:px-8">
+    <a href="/#top" class="group flex items-center gap-3">
+      <span
+        class="grid size-9 place-items-center rounded-xl bg-gradient-to-br from-primary to-accent text-primary-content shadow-lg shadow-primary/30"
+      >
+        <Icon name="command-line" class="size-5" />
+      </span>
+      <span class="flex flex-col leading-none">
+        <span class="font-mono text-sm font-semibold tracking-tight">fleet</span>
+        <span class="text-[10px] uppercase tracking-[0.2em] text-base-content/50">
+          remote AI, safely
+        </span>
+      </span>
+    </a>
+
+    <nav class="hidden items-center gap-1 text-sm text-base-content/70 md:flex">
+      {
+        links.map((link) => (
+          <a
+            href={link.href}
+            data-astro-prefetch={link.href.startsWith("/docs") ? true : undefined}
+            class="rounded-lg px-3 py-2 transition hover:bg-base-content/5 hover:text-base-content"
+          >
+            {link.label}
+          </a>
+        ))
+      }
+    </nav>
+
+    <div class="flex items-center gap-3">
+      <ThemeToggle />
+      <a
+        href={githubUrl}
+        rel="noopener noreferrer"
+        class="hidden items-center gap-2 rounded-xl border border-base-content/10 bg-base-content/5 px-4 py-2 text-sm font-medium transition hover:border-base-content/20 hover:bg-base-content/10 sm:flex"
+      >
+        <Icon name="code-bracket" class="size-4" /> GitHub
+      </a>
+    </div>
+  </div>
+</header>

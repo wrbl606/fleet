@@ -17,6 +17,7 @@ import json
 import re
 import shutil
 import subprocess
+import tempfile
 from pathlib import Path
 from typing import Any
 
@@ -61,7 +62,10 @@ def build_coi_config(
     }
 
     if llm_env:
-        cfg["forward_env"] = [llm_env]
+        # COI project/session configs (COI_CONFIG / .coi/config.toml) read host
+        # env forwarding from [defaults]; a top-level forward_env is silently
+        # ignored (COI v0.11.x). Profile configs use the top-level form.
+        cfg.setdefault("defaults", {})["forward_env"] = [llm_env]
 
     network: dict[str, Any] = {"mode": manifest.coi.network}
     if manifest.coi.network == "allowlist":
@@ -178,14 +182,35 @@ def render_coi_toml(
 
 
 def validate_coi_config(path: str) -> tuple[bool, list[dict[str, str]]]:
-    """Validate *path* with ``coi validate profile`` if COI is installed."""
+    """Validate *path* with ``coi validate profile`` if COI is installed.
+
+    The generated file is a COI project/session config, but the only schema
+    validator COI exposes is for *profiles*, which differs in where host-env
+    forwarding lives (``[defaults].forward_env`` vs a top-level ``forward_env``).
+    Project those fields to the profile shape before validating the shared rest.
+    """
     if shutil.which("coi") is None:
         return True, []
-    proc = subprocess.run(
-        ["coi", "validate", "profile", path, "--format", "json"],
-        capture_output=True,
-        text=True,
-    )
+
+    import tomllib
+
+    profile = tomllib.loads(Path(path).read_text())
+    defaults = profile.pop("defaults", {})
+    for key in ("forward_env", "environment", "env_commands"):
+        if key in defaults:
+            profile.setdefault(key, defaults[key])
+
+    with tempfile.TemporaryDirectory() as tmp:
+        projected = Path(tmp) / "profile.toml"
+        projected.write_text(dumps_toml(profile))
+        try:
+            proc = subprocess.run(
+                ["coi", "validate", "profile", str(projected), "--format", "json"],
+                capture_output=True,
+                text=True,
+            )
+        except OSError:
+            return True, []
     out = (proc.stdout or "").strip()
     if not out:
         return proc.returncode == 0, []

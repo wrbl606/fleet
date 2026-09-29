@@ -1,0 +1,239 @@
+---
+import DocsLayout from "../../layouts/DocsLayout.astro";
+
+const flow = `Jira / GitHub / Linear
+        │  POST {panel}/api/ingest?source=<source>
+        ▼
+Admin panel   ── record webhook.received ──▶ run ledger / ingest log
+        │  POST {FLEET_WEBHOOK_URL}?source=<source>&token=<token>
+        ▼  headers: x-fleet-event, x-github-event, x-github-delivery
+Jenkins Generic Webhook Trigger
+        │
+        ▼
+fleetDispatcher → fleetctl normalize → resolve → run → publish`;
+
+const forward = `POST {FLEET_WEBHOOK_URL}?source=<source>&token=<FLEET_WEBHOOK_TOKEN>
+Authorization: Bearer <FLEET_WEBHOOK_TOKEN>
+x-fleet-event: <event>
+x-github-event: <passthrough, GitHub only>
+x-github-delivery: <passthrough, GitHub only>
+Content-Type: application/json
+
+<raw webhook body, unchanged>`;
+
+const jira = `POST {panel}/api/ingest?source=jira
+Authorization: Bearer <FLEET_INGEST_TOKEN>`;
+
+const github = `Payload URL:  {FLEET_INGEST_PUBLIC_URL}?source=github
+Content type: application/json
+Secret:       <FLEET_GITHUB_WEBHOOK_SECRET>
+Events:       issues, issue_comment, pull_request_review_comment`;
+
+const linear = `POST {panel}/api/ingest?source=linear
+Authorization: Bearer <FLEET_INGEST_TOKEN>
+Events: Issue create / update`;
+
+const direct = `POST {jenkins}/generic-webhook-trigger/invoke?token=<fleet-webhook-token>&source=jira`;
+
+const gwt = `properties([
+  disableConcurrentBuilds(),
+  pipelineTriggers([[
+    $class: 'GenericTrigger',
+    genericVariables: [[key: 'payload', value: '$', expressionType: 'JSONPath']],
+    genericRequestVariables: [[key: 'source', regexpFilter: '']],
+    genericHeaderVariables: [
+      [key: 'x-fleet-event', regexpFilter: ''],
+      [key: 'x-github-event', regexpFilter: ''],
+      [key: 'x-github-delivery', regexpFilter: '']
+    ],
+    tokenCredentialId: 'fleet-webhook-token',
+    causeString: 'Fleet webhook ($source)'
+  ]])
+])`;
+
+const triggerApi = `curl -X POST {panel}/api/trigger \\
+  -H "Authorization: Bearer $FLEET_INGEST_TOKEN" \\
+  -H 'content-type: application/json' \\
+  -d '{"source":"jira","event":"jira:issue_created","payload":{"issue":{"key":"ENG-1"}}}'`;
+
+const triggerDry = `# preview the exact request without sending it
+curl -X POST {panel}/api/trigger \\
+  -H "Authorization: Bearer $FLEET_INGEST_TOKEN" \\
+  -H 'content-type: application/json' \\
+  -d '{"source":"jira","event":"jira:issue_created","dry_run":true,"payload":{}}'`;
+
+const local = `bash scripts/jenkins/setup.sh && bash scripts/jenkins/start.sh
+bash scripts/jenkins/prepare-local.sh
+bash admin/start.sh            # FLEET_WEBHOOK_URL defaults to the local Jenkins`;
+
+const debug = `# the panel's ingest log shows every webhook and its normalize/resolve outcome
+open {panel}/ingest
+
+# dispatcher reporting is enabled by --ingest on normalize/resolve
+python3 -m fleetctl resolve --registry registry.yaml --issue-file issue.json --ingest`;
+---
+
+<DocsLayout
+  title="Triggers & ingest"
+  description="Configure fleet triggers: the admin POST /api/ingest endpoint (record + forward), authentication, Jira/GitHub/Linear webhooks, and the Jenkins Generic Webhook Trigger."
+>
+  <div class="docs-prose">
+    <p class="font-mono text-xs uppercase tracking-[0.3em] text-primary/80">triggers &amp; ingest</p>
+    <h1 class="mt-3 text-3xl font-bold tracking-tight text-base-content sm:text-4xl">
+      Triggers &amp; ingest
+    </h1>
+    <p class="text-lg">
+      A task starts when a PM-tool webhook reaches the dispatcher. Senders POST to the admin panel's
+      ingest endpoint, which records the event and forwards it verbatim to the Jenkins Generic
+      Webhook Trigger — or you can point senders straight at Jenkins.
+    </p>
+
+    <h2>How a trigger flows</h2>
+    <pre><code>{flow}</code></pre>
+
+    <h2>The ingest endpoint</h2>
+    <p>
+      <code>POST /api/ingest</code> has two roles, selected by whether a <code>source</code> is
+      present. This is the newest logic: a webhook that carries a source is <strong>recorded and
+      forwarded</strong>; everything else is a ledger sink.
+    </p>
+    <table>
+      <thead>
+        <tr><th>Request</th><th>Behaviour</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>POST /api/ingest?source=&lt;source&gt;</code></td>
+          <td>
+            <strong>Inbound webhook.</strong> Records <code>webhook.received</code> (source, event,
+            payload) and forwards the raw body to <code>FLEET_WEBHOOK_URL</code>. The{" "}
+            <code>source</code> may also arrive as an <code>x-fleet-source</code> header.
+          </td>
+        </tr>
+        <tr>
+          <td><code>POST /api/ingest</code> (no source)</td>
+          <td>
+            <strong>Ledger sink.</strong> Records dispatcher lifecycle and debug events
+            (<code>run.started</code>, <code>run.finished</code>, <code>audit.event</code>,
+            <code>webhook.received</code>, <code>normalize.result</code>,
+            <code>resolve.result</code>). Never forwarded.
+          </td>
+        </tr>
+        <tr>
+          <td><code>POST /api/trigger</code></td>
+          <td>
+            Low-level: forward to the dispatcher <em>without</em> the ingest hop (same path the
+            Trigger page and scripts use). Restricted to <code>jira</code>, <code>linear</code>,
+            <code>github</code>; injects the <code>webhookEvent</code> field.
+          </td>
+        </tr>
+        <tr>
+          <td><code>GET /api/metrics</code></td>
+          <td>Prometheus text-format ledger metrics.</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h3>Event name</h3>
+    <ul>
+      <li>Set with <code>?event=</code> or the <code>x-fleet-event</code> header.</li>
+      <li>For GitHub the dispatcher derives it from the passed-through <code>X-GitHub-Event</code> header.</li>
+      <li>The normalizer decides whether the event is actionable; unknown sources/events are rejected there.</li>
+    </ul>
+
+    <h3>Authentication</h3>
+    <ul>
+      <li><code>Authorization: Bearer &lt;FLEET_INGEST_TOKEN&gt;</code> — used by the panel's own calls, the dispatcher, scripts, and PM tools that can set headers.</li>
+      <li><code>X-Hub-Signature-256</code> HMAC over the raw body — for GitHub, whose webhooks cannot set custom headers. Set the shared secret as <code>FLEET_GITHUB_WEBHOOK_SECRET</code> (the same value as the GitHub webhook's <strong>Secret</strong>).</li>
+      <li>Comparison is constant-time. When neither the token nor the secret is configured the API is open — <strong>dev only</strong>.</li>
+      <li>Invalid or missing credentials return <code>401</code>; invalid payloads return <code>422</code>.</li>
+    </ul>
+
+    <h3>Response</h3>
+    <pre><code>{`201 { "ok": true, "id": 42, "forward": { "status": 200 } }
+201 { "ok": true, "id": 42, "forward": { "dry_run": true } }
+201 { "ok": true, "id": 42, "forward": { "error": "webhook endpoint not configured" } }`}</code></pre>
+
+    <h2>Forwarding to Jenkins</h2>
+    <p>
+      The panel forwards the payload <strong>unchanged</strong> — no field injection — so the
+      dispatcher sees exactly what the PM tool sent. The token is sent both as a query parameter and
+      as a bearer header; retries are disabled.
+    </p>
+    <pre><code>{forward}</code></pre>
+    <p>
+      The forwarding target is trusted configuration (<code>FLEET_WEBHOOK_URL</code> /{" "}
+      <code>FLEET_WEBHOOK_TOKEN</code>) and is never supplied by the caller. The public URL of the
+      panel's own ingest endpoint is <code>FLEET_INGEST_PUBLIC_URL</code> (falls back to the panel's
+      endpoint URL).
+    </p>
+
+    <h2>Configure a source</h2>
+
+    <h3>GitHub (recommended path)</h3>
+    <p>GitHub authenticates with its webhook Secret; the panel records and forwards it.</p>
+    <pre><code>{github}</code></pre>
+
+    <h3>Jira</h3>
+    <p>
+      If your Jira installation can set an <code>Authorization</code> header on webhooks, point it at
+      the panel. Otherwise, Jira Cloud cannot set custom headers — send Jira webhooks{" "}
+      <strong>directly to Jenkins</strong>, whose Generic Webhook Trigger authenticates with the
+      token in the query string.
+    </p>
+    <pre><code>{jira}
+
+# or directly to Jenkins (no panel ingest-log entry):
+{direct}</code></pre>
+
+    <h3>Linear</h3>
+    <p>
+      Same trade-off as Jira: use the panel with a bearer header when supported, or send Linear
+      events straight to the Jenkins trigger URL with <code>&amp;source=linear</code>.
+    </p>
+    <pre><code>{linear}</code></pre>
+
+    <h2>Jenkins Generic Webhook Trigger</h2>
+    <p>
+      The trigger is declared by the pipeline's <code>properties(...)</code> block, so it registers on
+      the first build. It exposes the raw body as <code>payload</code> and the request/header values
+      the dispatcher expects.
+    </p>
+    <pre><code>{gwt}</code></pre>
+    <p>
+      Create a Jenkins string credential named <code>fleet-webhook-token</code>; its value is the{" "}
+      <code>token</code> in the invoke URL and in <code>FLEET_WEBHOOK_TOKEN</code>.
+    </p>
+
+    <h2>Panel trigger page &amp; API</h2>
+    <p>
+      The <code>/trigger</code> page and <code>POST /api/trigger</code> let you fire a webhook-like
+      event through the dispatcher without a real PM tool — useful for end-to-end tests. Use{" "}
+      <code>dry_run</code> to preview the exact request without sending.
+    </p>
+    <pre><code>{triggerApi}
+
+{triggerDry}</code></pre>
+
+    <h2>Local development</h2>
+    <p>
+      The bundled local Jenkins and panel wire this up end-to-end with placeholder tokens. See the
+      security model before exposing them.
+    </p>
+    <pre><code>{local}</code></pre>
+
+    <h2>Debugging</h2>
+    <p>
+      The <code>/ingest</code> page shows every incoming webhook, the normalization outcome
+      (<code>ok</code> / <code>filtered</code> / <code>error</code>), and the routing decision — the
+      fastest way to see why an event did not start a run.
+    </p>
+    <pre><code>{debug}</code></pre>
+
+    <h2>Next</h2>
+    <p>
+      Read the <a href="https://github.com/wrbl606/fleet/blob/main/docs/security.md">security model</a>{" "}
+      or the <a href="https://github.com/wrbl606/fleet/blob/main/docs/fleet-contract.md">.fleet/ contract</a>.
+    </p>
+  </div>
+</DocsLayout>

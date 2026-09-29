@@ -37,8 +37,10 @@ and port come from `--host`/`--port` (or `PHX_IP`/`PORT`), read by
 | Env var | Purpose |
 |---|---|
 | `FLEET_INGEST_TOKEN` | Bearer token required by `POST /api/ingest` and `GET /api/metrics` |
-| `FLEET_WEBHOOK_URL` | Endpoint the **Trigger** page posts webhook-like events to (e.g. the Jenkins Generic Webhook Trigger invoke URL) |
+| `FLEET_WEBHOOK_URL` | Dispatcher endpoint that inbound webhooks are forwarded to (e.g. the Jenkins Generic Webhook Trigger invoke URL) |
 | `FLEET_WEBHOOK_TOKEN` | Token appended to the webhook URL and sent as a bearer header |
+| `FLEET_INGEST_PUBLIC_URL` | Public URL of this panel's ingest endpoint, shown on the **Trigger** page (defaults to the panel's own endpoint URL) |
+| `FLEET_GITHUB_WEBHOOK_SECRET` | GitHub webhook **Secret**; when set, `/api/ingest?source=github` accepts a valid `X-Hub-Signature-256` HMAC instead of a bearer header |
 | `FLEET_JENKINS_URL` | Base URL of the Jenkins master web UI (e.g. `https://jenkins.example.com/`); shown as a nav link and on the Trigger page |
 | `GITHUB_TOKEN` | GitOps PRs (`contents:write`, `pull-requests:write`) |
 | `FLEET_ADMIN_USER` / `FLEET_ADMIN_PASSWORD` | Optional HTTP Basic auth for the UI |
@@ -64,23 +66,28 @@ Other accepted events: `run.started`, `audit.event` (from
 ## Triggering a test run
 
 The **Trigger** page (`/trigger`) lets an admin fire a webhook-like event at the
-configured dispatcher endpoint to exercise the pipeline without a real PM tool:
+fleet ingest endpoint to exercise the pipeline without a real PM tool:
 
 1. Set `FLEET_WEBHOOK_URL` (the Jenkins GWT invoke URL, e.g.
-   `https://jenkins/generic-webhook-trigger/invoke`) and `FLEET_WEBHOOK_TOKEN`.
+   `https://jenkins/generic-webhook-trigger/invoke`) and `FLEET_WEBHOOK_TOKEN`
+   so the panel can forward to the dispatcher.
 2. Open `/trigger`, pick a source, edit the JSON payload (a Jira
    `issue_created` sample is pre-filled), and click **Trigger run**.
-3. Use **Dry run** to preview the exact request (URL + body) without sending.
+3. Use **Dry run** to preview the exact request (endpoint + body) without
+   sending.
 
-The request is `POST <url>?source=<source>&token=<token>` with the event name in
-the `x-fleet-event` header and the payload as the JSON body, matching the
-`Jenkinsfile` Generic Webhook Trigger wiring. The resulting run then appears on
-the ledger as Jenkins posts `run.finished` back to `/api/ingest`.
+The page posts the raw payload to `POST <panel>/api/ingest?source=<source>`
+(bearer `FLEET_INGEST_TOKEN`). The panel records it as `webhook.received` and
+forwards it to the dispatcher as `POST <FLEET_WEBHOOK_URL>?source=<source>&token=<token>`
+with the event name in the `x-fleet-event` header and the payload as the JSON
+body, matching the `Jenkinsfile` Generic Webhook Trigger wiring. The resulting
+run then appears on the ledger as Jenkins posts `run.finished` back to
+`/api/ingest`.
 
 ### With the local Jenkins
 
-`admin/start.sh` already points the Trigger page at the local Jenkins created by
-`scripts/jenkins/`:
+`admin/start.sh` already points the forwarding target (`FLEET_WEBHOOK_URL`) at
+the local Jenkins created by `scripts/jenkins/`:
 
 ```bash
 bash scripts/jenkins/prepare-local.sh   # local git remotes
@@ -122,9 +129,10 @@ run completes against the deterministic stub agent.
 |---|---|
 | `GET /` | Live run ledger (filters by status, streams live updates) |
 | `GET /runs/:id` | Run detail: iterations, PR, audit events |
-| `GET /trigger` | Send a webhook-like event to the dispatcher to test the pipeline |
+| `GET /trigger` | Send a webhook-like event to the ingest endpoint to test the pipeline |
 | `GET /gitops` | Commit a file change to a branch and open a PR |
-| `POST /api/ingest` | Run/audit ingest (bearer) |
+| `POST /api/ingest?source=<s>` | Inbound webhook entry point: record + forward to the dispatcher (bearer) |
+| `POST /api/ingest` | Run/audit lifecycle ingest, no forwarding (bearer) |
 | `GET /api/metrics` | Prometheus metrics (bearer) |
 
 ## Ledger schema

@@ -142,6 +142,18 @@ if token = System.get_env("FLEET_INGEST_TOKEN") do
   config :fleet_admin, ingest_token: token
 end
 
+# Public URL external senders should POST webhooks to (shown on the Trigger
+# page). Falls back to the panel's own endpoint URL when unset.
+if url = System.get_env("FLEET_INGEST_PUBLIC_URL") do
+  config :fleet_admin, :fleet_ingest_public_url, url
+end
+
+# Secret for the GitHub webhook HMAC (`X-Hub-Signature-256`). When set, GitHub
+# can authenticate to POST /api/ingest?source=github without a bearer header.
+if secret = System.get_env("FLEET_GITHUB_WEBHOOK_SECRET") do
+  config :fleet_admin, :github_webhook_secret, secret
+end
+
 # Token used for GitOps config-write PRs (contents:write + pull-requests:write).
 if token = System.get_env("GITHUB_TOKEN") do
   config :fleet_admin, github_token: token

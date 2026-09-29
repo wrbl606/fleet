@@ -3,7 +3,7 @@ defmodule FleetAdminWeb.TriggerLive do
 
   use FleetAdminWeb, :live_view
 
-  alias FleetAdmin.Trigger
+  alias FleetAdmin.{Ingest, Trigger}
 
   @sample_jira """
   {
@@ -65,7 +65,7 @@ defmodule FleetAdminWeb.TriggerLive do
      socket
      |> assign(:page_title, "Trigger")
      |> assign(:configured?, Trigger.configured?())
-     |> assign(:endpoint, Trigger.endpoint("jira"))
+     |> assign(:endpoint, Ingest.endpoint("jira"))
      |> assign(:json_error, nil)
      |> assign(:result, nil)
      |> assign_form(%{})}
@@ -86,12 +86,26 @@ defmodule FleetAdminWeb.TriggerLive do
 
     socket = assign_json_error(socket, params["payload"])
 
-    case Trigger.trigger(source, event, params["payload"], dry_run: dry_run) do
-      {:ok, result} ->
+    result = Ingest.accept_webhook(source, event, params["payload"], dry_run: dry_run)
+
+    case result do
+      {:ok, %{dry_run: true} = preview} ->
         {:noreply,
          socket
-         |> assign(:result, {:ok, result})
-         |> put_flash(:info, flash_message(result))}
+         |> assign(:result, {:ok, preview})
+         |> put_flash(:info, "Dry run preview ready")}
+
+      {:ok, %{forward: {:ok, forward}}} ->
+        {:noreply,
+         socket
+         |> assign(:result, {:ok, forward})
+         |> put_flash(:info, flash_message(forward))}
+
+      {:ok, %{forward: {:error, reason}}} ->
+        {:noreply,
+         socket
+         |> assign(:result, {:error, reason})
+         |> put_flash(:error, "Trigger failed: " <> format_reason(reason))}
 
       {:error, reason} ->
         {:noreply,
@@ -109,7 +123,7 @@ defmodule FleetAdminWeb.TriggerLive do
       preset ->
         {:noreply,
          socket
-         |> assign(:endpoint, Trigger.endpoint(preset["source"]))
+         |> assign(:endpoint, Ingest.endpoint(preset["source"]))
          |> assign(:json_error, nil)
          |> assign(:result, nil)
          |> assign_form(preset)}
@@ -134,12 +148,12 @@ defmodule FleetAdminWeb.TriggerLive do
     end
   end
 
-  defp flash_message(%{dry_run: true}), do: "Dry run preview ready"
-  defp flash_message(%{status: status}), do: "Webhook sent (HTTP #{status})"
+  defp flash_message(%{status: status}), do: "Webhook accepted (HTTP #{status})"
 
   defp format_reason(:invalid_json), do: "payload is not valid JSON"
   defp format_reason(:payload_must_be_object), do: "payload must be a JSON object"
-  defp format_reason(:not_configured), do: "no webhook endpoint configured"
+  defp format_reason(:invalid_payload), do: "payload is invalid"
+  defp format_reason(:not_configured), do: "no dispatcher endpoint configured"
   defp format_reason({:unknown_source, source}), do: "unknown source: #{source}"
   defp format_reason(other), do: inspect(other)
 
@@ -153,8 +167,9 @@ defmodule FleetAdminWeb.TriggerLive do
       <.header>
         Trigger a run
         <:subtitle>
-          Send a webhook-like event to the configured dispatcher endpoint. Use this
-          to test the pipeline without a real PM-tool webhook.
+          Send a webhook-like event to the fleet ingest endpoint
+          (<code>/api/ingest</code>), which records it and forwards it to the
+          dispatcher. Use this to test the pipeline without a real PM-tool webhook.
         </:subtitle>
       </.header>
 
@@ -230,13 +245,13 @@ defmodule FleetAdminWeb.TriggerLive do
             <div class="alert">
               <p class="font-semibold">Dry run preview</p>
               <p class="text-sm">
-                POST <code>{preview.url}</code>
+                POST <code>{preview.endpoint}</code>
               </p>
               <pre class="whitespace-pre-wrap text-xs">{Jason.encode!(preview.body, pretty: true)}</pre>
             </div>
           <% {:ok, result} -> %>
             <div class="alert alert-success">
-              <p>Request sent: HTTP {result.status}</p>
+              <p>Recorded and forwarded to dispatcher: HTTP {result.status}</p>
               <pre class="whitespace-pre-wrap text-xs">{format_body(result.body)}</pre>
             </div>
           <% {:error, reason} -> %>

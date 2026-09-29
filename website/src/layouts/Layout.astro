@@ -1,0 +1,153 @@
+---
+import "../styles/global.css";
+import { githubUrl } from "../data";
+
+interface Props {
+  title?: string;
+  description?: string;
+}
+
+const {
+  title = "fleet — safe remote AI implementation",
+  description = "fleet lets a team hand real engineering tasks to an AI coding agent without trusting it. The agent works in a locked-down sandbox on your own hardware and delivers a human-reviewed pull request — no GitHub token, no open network, fail-closed policy.",
+} = Astro.props;
+
+const canonical = new URL(Astro.url.pathname, Astro.site).href;
+const ogImage = new URL("/images/og.png", Astro.site).href;
+const ogImageAlt =
+  "fleet — safe remote AI implementation. No agent GitHub token, fail-closed sandbox, PR-only delivery.";
+
+const structuredData = {
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "WebSite",
+      name: "fleet",
+      url: canonical,
+      description,
+    },
+    {
+      "@type": "SoftwareApplication",
+      name: "fleet",
+      applicationCategory: "DeveloperApplication",
+      operatingSystem: "Linux, macOS, Windows",
+      description,
+      url: canonical,
+      image: ogImage,
+      sameAs: [githubUrl],
+      offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
+      featureList: [
+        "AI coding agent in a disposable, locked-down sandbox",
+        "No GitHub token given to the agent",
+        "Fail-closed native and containerized runners",
+        "Central, versioned routing and policy registry",
+        "Human-reviewed pull request delivery",
+      ],
+    },
+  ],
+};
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="generator" content={Astro.generator} />
+
+    <title>{title}</title>
+    <meta name="description" content={description} />
+    <meta
+      name="keywords"
+      content="AI coding agent, safe remote implementation, sandboxed agent, prompt injection defense, Jenkins, Incus, COI, Seatbelt, pull request automation, secure AI, fleetctl, Phoenix LiveView"
+    />
+    <meta name="author" content="fleet" />
+    <meta name="robots" content="index, follow, max-image-preview:large" />
+    <meta name="theme-color" content="#0b0d17" />
+    <link rel="canonical" href={canonical} />
+
+    <link rel="icon" href="/favicon.ico" sizes="any" />
+    <link rel="icon" type="image/svg+xml" href="/images/favicon.svg" />
+    <link rel="apple-touch-icon" href="/images/icon.png" />
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="fleet" />
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    <meta property="og:url" content={canonical} />
+    <meta property="og:image" content={ogImage} />
+    <meta property="og:image:type" content="image/png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content={ogImageAlt} />
+    <meta property="og:locale" content="en_US" />
+
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content={title} />
+    <meta name="twitter:description" content={description} />
+    <meta name="twitter:image" content={ogImage} />
+    <meta name="twitter:image:alt" content={ogImageAlt} />
+
+    <script type="application/ld+json" set:html={JSON.stringify(structuredData)} />
+
+    <link rel="preload" as="font" type="font/woff2" href="/fonts/inter-latin.woff2" crossorigin />
+    <link
+      rel="preload"
+      as="font"
+      type="font/woff2"
+      href="/fonts/jetbrains-mono-latin.woff2"
+      crossorigin
+    />
+
+    <script is:inline>
+      (() => {
+        const systemTheme = () =>
+          matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+
+        const setTheme = (theme) => {
+          if (theme === "system") {
+            localStorage.removeItem("fleet:theme");
+            document.documentElement.setAttribute("data-theme", systemTheme());
+            document.documentElement.setAttribute("data-theme-source", "system");
+          } else {
+            localStorage.setItem("fleet:theme", theme);
+            document.documentElement.setAttribute("data-theme", theme);
+            document.documentElement.setAttribute("data-theme-source", "user");
+          }
+        };
+
+        if (!document.documentElement.hasAttribute("data-theme")) {
+          setTheme(localStorage.getItem("fleet:theme") || "system");
+        }
+
+        window.addEventListener("storage", (e) => {
+          if (e.key === "fleet:theme") setTheme(e.newValue || "system");
+        });
+        window.addEventListener("fleet:set-theme", (e) =>
+          setTheme(e.target.dataset.theme)
+        );
+
+        matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => {
+          if (document.documentElement.getAttribute("data-theme-source") === "system") {
+            document.documentElement.setAttribute("data-theme", systemTheme());
+          }
+        });
+      })();
+    </script>
+  </head>
+  <body>
+    <div class="min-h-screen bg-base-300 text-base-content selection:bg-primary/30">
+      <div class="pointer-events-none fixed inset-0 bg-grid opacity-[0.35]"></div>
+      <div
+        class="pointer-events-none fixed left-1/2 top-0 h-[520px] w-[900px] -translate-x-1/2 rounded-full bg-primary/20 blur-[140px]"
+      >
+      </div>
+
+      <div class="relative">
+        <slot />
+      </div>
+    </div>
+  </body>
+</html>

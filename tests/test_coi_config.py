@@ -40,10 +40,11 @@ class CoiConfigTest(unittest.TestCase):
         self.manifest = FleetManifest.from_file(str(SAMPLE / ".fleet" / "fleet.toml"))
 
     def test_forward_env_only_when_declared(self):
+        # COI project/session configs read host-env forwarding from [defaults].
         cfg = build_coi_config(self.manifest, self.reg, llm_env="ANTHROPIC_API_KEY")
-        self.assertEqual(cfg["forward_env"], ["ANTHROPIC_API_KEY"])
+        self.assertEqual(cfg["defaults"]["forward_env"], ["ANTHROPIC_API_KEY"])
         cfg2 = build_coi_config(self.manifest, self.reg, llm_env=None)
-        self.assertNotIn("forward_env", cfg2)
+        self.assertNotIn("forward_env", cfg2.get("defaults", {}))
 
     def test_untrusted_limits_are_registry_owned(self):
         cfg = build_coi_config(self.manifest, self.reg, llm_env=None)
@@ -84,7 +85,7 @@ class CoiConfigTest(unittest.TestCase):
         cfg = build_coi_config(self.manifest, self.reg, llm_env="ANTHROPIC_API_KEY")
         text = dumps_toml(cfg)
         parsed = tomllib.loads(text)
-        self.assertEqual(parsed["forward_env"], ["ANTHROPIC_API_KEY"])
+        self.assertEqual(parsed["defaults"]["forward_env"], ["ANTHROPIC_API_KEY"])
         self.assertEqual(parsed["network"]["mode"], "restricted")
 
         import tempfile
