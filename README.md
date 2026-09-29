@@ -11,6 +11,36 @@ The goal is not "fully autonomous coding" — it is **safe remote
 implementation**: delegate the typing while routing, credentials, blast radius,
 and merge authority stay under central, human-controlled policy.
 
+```mermaid
+flowchart LR
+    S["Senders<br/>Jira · GitHub · Linear"]
+    A["Admin panel<br/>ingest · ledger"]
+    JC["Jenkins controller<br/>trigger · routing · credentials"]
+    F["fleetctl<br/>normalize · resolve · plan · run"]
+    TP["Trusted publisher<br/>push · gh pr create"]
+    GH["GitHub<br/>repo · pull request"]
+
+    S -- webhook --> A
+    A -- forward --> JC
+    JC -- starts stages --> F
+    F -- on verify pass --> TP
+    TP -- push · open PR --> GH
+
+    subgraph SAND["Isolated sandbox · COI / native — fail-closed · allowlisted egress"]
+        AG["Agent<br/>claude · codex · opencode<br/>holds no GitHub token"]
+    end
+
+    F -- runs the loop --> AG
+
+    JC -. read token .-> F
+    JC -. LLM key .-> AG
+    JC -. write token .-> TP
+```
+
+Solid edges are dependencies/orchestration; dashed edges are credential
+handoffs bound by Jenkins. The agent never receives a GitHub token — only the
+LLM key it needs to run.
+
 ## What it defends against
 
 | Attack / risk | Mitigation |
