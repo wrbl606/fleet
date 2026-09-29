@@ -12,7 +12,7 @@ implementation**: delegate the typing while routing, credentials, blast radius,
 and merge authority stay under central, human-controlled policy.
 
 ```mermaid
-flowchart LR
+flowchart TB
     S["Senders<br/>Jira · GitHub · Linear"]
     A["Admin panel<br/>ingest · ledger"]
     JC["Jenkins controller<br/>trigger · routing · credentials"]
