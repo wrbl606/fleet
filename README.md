@@ -31,6 +31,7 @@ flowchart TB
     end
 
     F -- runs the loop --> AG
+    AG -- dead drop --> TP
 
     JC -. read token .-> F
     JC -. LLM key .-> AG
@@ -38,8 +39,10 @@ flowchart TB
 ```
 
 Solid edges are dependencies/orchestration; dashed edges are credential
-handoffs bound by Jenkins. The agent never receives a GitHub token — only the
-LLM key it needs to run.
+handoffs bound by Jenkins. The agent never receives a GitHub token: it leaves
+its code changes in a secure **dead drop** that only the trusted publisher (the
+fleetctl/Jenkins publish stage) can read back — and only that publisher holds
+the scoped write token.
 
 ## What it defends against
 

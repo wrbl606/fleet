@@ -10,7 +10,7 @@
     viewBox="0 0 940 640"
     class="mx-auto h-auto w-full min-w-[760px] max-w-4xl"
     role="img"
-    aria-label="Dependency graph. Senders reach the admin panel, which forwards to the Jenkins controller. Jenkins starts stages on fleetctl, binds credentials and routes the run. fleetctl drives the isolated sandbox where the agent runs, and hands a passing change to the trusted publisher, which pushes a pull request to GitHub. Jenkins hands the LLM key to the agent, a read token to the clone step, and a scoped write token to the publisher; the agent never receives a GitHub token."
+    aria-label="Dependency graph. Senders reach the admin panel, which forwards to the Jenkins controller. Jenkins starts stages on fleetctl, binds credentials and routes the run. fleetctl drives the isolated sandbox where the agent runs. The agent dead-drops its code changes to the trusted publisher; on a verify pass, fleetctl hands the change to the same publisher, which pushes a pull request to GitHub. Jenkins hands the LLM key to the agent, a read token to the clone step, and a scoped write token to the publisher; the agent never receives a GitHub token."
   >
     <defs>
       <marker
@@ -69,6 +69,9 @@
 
     <path d="M350,330 L350,500" class="fill-none stroke-base-content/40" stroke-width="1.5" marker-end="url(#arrow)"></path>
     <text x="350" y="415" text-anchor="middle" font-size="11" class="fill-base-content/50" paint-order="stroke" stroke-linejoin="round" stroke-width="5" style="stroke: var(--color-base-300)">on verify pass</text>
+
+    <path d="M625,395 C590,440 500,458 432,497" class="fill-none stroke-base-content/40" stroke-width="1.5" marker-end="url(#arrow)"></path>
+    <text x="545" y="448" text-anchor="middle" font-size="11" class="fill-base-content/50" paint-order="stroke" stroke-linejoin="round" stroke-width="5" style="stroke: var(--color-base-300)">dead drop</text>
 
     <path d="M450,540 L610,540" class="fill-none stroke-base-content/40" stroke-width="1.5" marker-end="url(#arrow)"></path>
     <text x="530" y="540" text-anchor="middle" font-size="11" class="fill-base-content/50" paint-order="stroke" stroke-linejoin="round" stroke-width="5" style="stroke: var(--color-base-300)">push · open PR</text>

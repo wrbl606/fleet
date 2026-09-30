@@ -66,16 +66,31 @@ if config_env() == :prod do
 
   host = System.get_env("PHX_HOST") || "example.com"
 
+  # Bind address. Defaults to all interfaces (IPv6 any, dual-stack); set PHX_IP
+  # (e.g. "127.0.0.1") to restrict to a single address.
+  bind_ip =
+    case System.get_env("PHX_IP") do
+      nil ->
+        {0, 0, 0, 0, 0, 0, 0, 0}
+
+      ip ->
+        case ip |> String.to_charlist() |> :inet.parse_address() do
+          {:ok, addr} -> addr
+          {:error, _} -> {0, 0, 0, 0, 0, 0, 0, 0}
+        end
+    end
+
   config :fleet_admin, :dns_cluster_query, System.get_env("DNS_CLUSTER_QUERY")
 
   config :fleet_admin, FleetAdminWeb.Endpoint,
     url: [host: host, port: 443, scheme: "https"],
     http: [
-      # Enable IPv6 and bind on all interfaces.
-      # Set it to  {0, 0, 0, 0, 0, 0, 0, 1} for local network only access.
-      # See the documentation on https://bandit.hexdocs.pm/Bandit.html#t:options/0
-      # for details about using IPv6 vs IPv4 and loopback vs public addresses.
-      ip: {0, 0, 0, 0, 0, 0, 0, 0}
+      # Enable IPv6 and bind on all interfaces by default.
+      # Set PHX_IP to {0, 0, 0, 0, 0, 0, 0, 1} equivalent ("::1") for local
+      # network only access. See the documentation on
+      # https://bandit.hexdocs.pm/Bandit.html#t:options/0 for details about
+      # using IPv6 vs IPv4 and loopback vs public addresses.
+      ip: bind_ip
     ],
     secret_key_base: secret_key_base
 
